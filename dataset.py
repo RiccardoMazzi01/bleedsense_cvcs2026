@@ -118,3 +118,35 @@ def split_rabbani_data(image_paths, mask_paths, val_size=0.15, test_size=0.15, s
         return image_paths[indices], mask_paths[indices]
 
     return subset(train_idx), subset(val_idx), subset(test_idx)
+
+
+def get_aggressive_transforms(img_size=(256, 256)):
+    """Augmentation 'aggressive' per la Fase 2 (Su et al., AAAI 2023 / setup chirurgico:
+    luminosita'/contrasto, hue/saturation, gamma, blur, noise, compressione).
+
+    Il val_transform e' identico a quello di get_transforms(), cosi' la valutazione resta
+    comparabile tra gli esperimenti 'light' (Fase 1) e 'aggressive' (Fase 2): cambia solo
+    cosa vede il modello in training, non come viene misurato.
+    """
+    train_transform = A.Compose([
+        A.Resize(img_size[0], img_size[1]),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.2),
+        A.RandomRotate90(p=0.3),
+        A.RandomBrightnessContrast(p=0.7),
+        A.HueSaturationValue(p=0.5),
+        A.RandomGamma(p=0.4),
+        A.OneOf([A.GaussianBlur(), A.MotionBlur()], p=0.3),
+        A.GaussNoise(p=0.3),
+        A.ImageCompression(p=0.3),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ])
+
+    val_transform = A.Compose([
+        A.Resize(img_size[0], img_size[1]),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ])
+
+    return train_transform, val_transform
