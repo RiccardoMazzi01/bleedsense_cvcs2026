@@ -1,5 +1,6 @@
 import os
 import glob
+import random
 import numpy as np
 import cv2
 import torch
@@ -56,6 +57,51 @@ def get_transforms(img_size=(256, 256)):
     ])
 
     return train_transform, val_transform
+
+
+class AdaptedBleedingDataset(MedicalBleedingDataset):
+    """Come MedicalBleedingDataset, ma prima del transform applica una funzione di
+    appearance/domain adaptation (Reinhard, FDA, ...) usando un'immagine campionata
+    a caso da un pool di immagini non annotate del dominio target (Fase 3).
+    """
+
+    def __init__(self, image_paths, mask_paths, target_image_paths, adapt_fn, transform=None, work_size=(256, 256)):
+        super().__init__(image_paths, mask_paths, transform=transform)
+        self.target_image_paths = target_image_paths
+        self.adapt_fn = adapt_fn
+        self.work_size = work_size  # ridimensiona prima dell'adaptation: FDA fa una FFT per canale,
+        # farla a piena risoluzione sarebbe inutilmente lento dato che il modello lavora a work_size
+
+    def __getitem__(self, idx):
+        img_path = self.image_paths[idx]
+        mask_path = self.mask_paths[idx]
+
+        image = cv2.imread(img_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = cv2.resize(image, self.work_size)
+
+        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+        mask = (mask > 0).astype(np.float32)
+
+        target_path = random.choice(self.target_image_paths)
+        target_image = cv2.imread(target_path)
+        target_image = cv2.cvtColor(target_image, cv2.COLOR_BGR2RGB)
+        target_image = cv2.resize(target_image, self.work_size)
+        image = self.adapt_fn(image, target_image)
+
+        if self.transform is not None:
+            augmented = self.transform(image=image, mask=mask)
+            image = augmented['image']
+            mask = augmented['mask']
+
+        if isinstance(mask, torch.Tensor):
+            if mask.ndim == 2:
+                mask = mask.unsqueeze(0)
+        else:
+            mask = np.expand_dims(mask, axis=0)
+
+        return image, mask
+
 
 def load_hemoset_data(hemoset_dir):
     image_paths = []
@@ -150,3 +196,24 @@ def get_aggressive_transforms(img_size=(256, 256)):
     ])
 
     return train_transform, val_transform
+
+
+def get_rabbani_train_pool(data_dir, seed=42, val_size=0.15, test_size=0.15):
+    """Solo le immagini (senza maschere) dello split di training di Rabbani: pool di
+    immagini non annotate del dominio target per la Fase 3 (mai il val/test, per non
+    contaminare la valutazione cross-dataset).
+    """
+    images, masks = load_rabbani_data(os.path.join(data_dir, "rabbani"))
+    (train_img, _), _, _ = split_rabbani_data(images, masks, seed=seed, val_size=val_size, test_size=test_size)
+    return train_img
+
+
+def get_hemoset_all_images(data_dir):
+    """Tutte le immagini di HemoSet (senza maschere): pool di immagini non annotate del
+    dominio target per la Fase 3 quando si allena su Rabbani. Coerente con il fatto che
+    tutto HemoSet e' gia' usato, senza etichette, come target di valutazione cross-dataset
+    per i modelli allenati su Rabbani (setting transduttivo, esplicitamente sanzionato
+    dalla tutor: 'puoi utilizzare anche immagini non annotate del dominio target').
+    """
+    images, _, _, _ = load_hemoset_data(os.path.join(data_dir, "hemoset"))
+    return images

@@ -13,20 +13,29 @@ from torch.utils.data import DataLoader
 from sklearn.model_selection import StratifiedGroupKFold
 
 from dataset import (
+    AdaptedBleedingDataset,
     MedicalBleedingDataset,
     get_aggressive_transforms,
+    get_hemoset_all_images,
+    get_rabbani_train_pool,
     get_transforms,
     load_hemoset_data,
     load_rabbani_data,
     split_rabbani_data,
 )
+from domain_adaptation import fda_transfer, reinhard_color_transfer
+from metrics import MetricTracker
+from models import get_model
 
 AUGMENTATION_TRANSFORMS = {
     "light": get_transforms,
     "aggressive": get_aggressive_transforms,
 }
-from metrics import MetricTracker
-from models import get_model
+
+ADAPTATION_FUNCTIONS = {
+    "reinhard": reinhard_color_transfer,
+    "fda": fda_transfer,
+}
 
 # Seed fisso per gli split dei dati: garantisce che ogni architettura/run veda
 # esattamente gli stessi fold HemoSet e lo stesso train/val/test di Rabbani,
@@ -56,7 +65,7 @@ class DiceBCELoss(nn.Module):
         return self.bce_weight * bce + (1 - self.bce_weight) * dice_loss
 
 
-def build_hemoset_fold(data_dir, fold, img_size, augmentation="light"):
+def build_hemoset_fold(data_dir, fold, img_size, augmentation="light", adaptation="none"):
     images, masks, groups, labels = load_hemoset_data(os.path.join(data_dir, "hemoset"))
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=SPLIT_SEED)
     splits = list(sgkf.split(images, labels, groups))
@@ -64,7 +73,16 @@ def build_hemoset_fold(data_dir, fold, img_size, augmentation="light"):
 
     train_tf, _ = AUGMENTATION_TRANSFORMS[augmentation](img_size)
     _, val_tf = get_transforms(img_size)  # valutazione sempre senza augmentation, per confrontabilita'
-    train_ds = MedicalBleedingDataset(images[train_idx], masks[train_idx], transform=train_tf)
+
+    if adaptation == "none":
+        train_ds = MedicalBleedingDataset(images[train_idx], masks[train_idx], transform=train_tf)
+    else:
+        target_pool = get_rabbani_train_pool(data_dir, seed=SPLIT_SEED)
+        train_ds = AdaptedBleedingDataset(
+            images[train_idx], masks[train_idx], target_pool,
+            ADAPTATION_FUNCTIONS[adaptation], transform=train_tf, work_size=img_size,
+        )
+
     val_ds = MedicalBleedingDataset(images[val_idx], masks[val_idx], transform=val_tf)
     return train_ds, val_ds
 
@@ -75,14 +93,23 @@ def build_hemoset_full(data_dir, img_size):
     return MedicalBleedingDataset(images, masks, transform=val_tf)
 
 
-def build_rabbani_splits(data_dir, img_size, augmentation="light"):
+def build_rabbani_splits(data_dir, img_size, augmentation="light", adaptation="none"):
     images, masks = load_rabbani_data(os.path.join(data_dir, "rabbani"))
     (train_img, train_mask), (val_img, val_mask), (test_img, test_mask) = split_rabbani_data(
         images, masks, seed=SPLIT_SEED
     )
     train_tf, _ = AUGMENTATION_TRANSFORMS[augmentation](img_size)
     _, val_tf = get_transforms(img_size)  # valutazione sempre senza augmentation, per confrontabilita'
-    train_ds = MedicalBleedingDataset(train_img, train_mask, transform=train_tf)
+
+    if adaptation == "none":
+        train_ds = MedicalBleedingDataset(train_img, train_mask, transform=train_tf)
+    else:
+        target_pool = get_hemoset_all_images(data_dir)
+        train_ds = AdaptedBleedingDataset(
+            train_img, train_mask, target_pool,
+            ADAPTATION_FUNCTIONS[adaptation], transform=train_tf, work_size=img_size,
+        )
+
     val_ds = MedicalBleedingDataset(val_img, val_mask, transform=val_tf)
     test_ds = MedicalBleedingDataset(test_img, test_mask, transform=val_tf)
     return train_ds, val_ds, test_ds
@@ -121,6 +148,8 @@ def main():
     parser.add_argument("--fold", type=int, default=0, help="Indice fold (0-4), usato solo con --dataset hemoset")
     parser.add_argument("--augmentation", choices=["light", "aggressive"], default="light",
                          help="Policy di data augmentation per il training (Fase 2)")
+    parser.add_argument("--adaptation", choices=["none", "reinhard", "fda"], default="none",
+                         help="Appearance/domain adaptation verso il dominio target (Fase 3)")
     parser.add_argument("--data-dir", default="/work/cvcs2026/bleedsense/datasets")
     parser.add_argument("--output-dir", default="/work/cvcs2026/bleedsense/results")
     parser.add_argument("--epochs", type=int, default=40)
@@ -139,6 +168,7 @@ def main():
     run_name = f"{args.dataset}_{args.architecture}"
     run_name += f"_fold{args.fold}" if args.dataset == "hemoset" else ""
     run_name += f"_aug{args.augmentation}" if args.augmentation != "light" else ""
+    run_name += f"_adapt{args.adaptation}" if args.adaptation != "none" else ""
 
     os.makedirs(args.output_dir, exist_ok=True)
     ckpt_dir = os.path.join(args.output_dir, "checkpoints")
@@ -147,12 +177,14 @@ def main():
 
     # --- Dati ---
     if args.dataset == "hemoset":
-        train_ds, val_ds = build_hemoset_fold(args.data_dir, args.fold, img_size, args.augmentation)
+        train_ds, val_ds = build_hemoset_fold(args.data_dir, args.fold, img_size, args.augmentation, args.adaptation)
         cross_ds = build_rabbani_splits(args.data_dir, img_size)[2]  # test split di Rabbani
         cross_name = "rabbani_test"
         indomain_test_ds = val_ds  # per HemoSet il val set del fold e' il proxy in-domain
     else:
-        train_ds, val_ds, indomain_test_ds = build_rabbani_splits(args.data_dir, img_size, args.augmentation)
+        train_ds, val_ds, indomain_test_ds = build_rabbani_splits(
+            args.data_dir, img_size, args.augmentation, args.adaptation
+        )
         cross_ds = build_hemoset_full(args.data_dir, img_size)  # tutto HemoSet, mai visto in training
         cross_name = "hemoset_full"
 
@@ -218,6 +250,7 @@ def main():
         "architecture": args.architecture,
         "encoder": args.encoder,
         "augmentation": args.augmentation,
+        "adaptation": args.adaptation,
         "fold": args.fold if args.dataset == "hemoset" else None,
         "seed": args.seed,
         "epochs_trained": len(history),
