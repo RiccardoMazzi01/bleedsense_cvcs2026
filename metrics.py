@@ -88,8 +88,8 @@ class MetricTracker:
         self._precision, self._recall, self._f1 = [], [], []
         self._hd95 = []
 
-    def update(self, logits, target):
-        preds = _to_numpy_binary(logits, threshold=self.threshold, from_logits=True)
+    def update(self, logits, target, from_logits=True):
+        preds = _to_numpy_binary(logits, threshold=self.threshold, from_logits=from_logits)
         targets = _to_numpy_binary(target, threshold=0.5, from_logits=False)
 
         for p, t in zip(preds, targets):
