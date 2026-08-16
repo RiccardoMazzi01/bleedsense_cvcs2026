@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+*.egg-info/
+
+# Data (mai versionare i dataset, sono troppo grandi / non nostri da ridistribuire)
+data/
+datasets/
+*.zip
+*.tar
+*.tar.gz
+
+# Checkpoints e output pesanti
+checkpoints/
+*.pth
+*.pt
+*.ckpt
+
+# Log SLURM e training
+logs/
+*.out
+*.err
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
