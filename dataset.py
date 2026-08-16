@@ -81,6 +81,7 @@ class AdaptedBleedingDataset(MedicalBleedingDataset):
         image = cv2.resize(image, self.work_size)
 
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+        mask = cv2.resize(mask, self.work_size, interpolation=cv2.INTER_NEAREST)
         mask = (mask > 0).astype(np.float32)
 
         target_path = random.choice(self.target_image_paths)
