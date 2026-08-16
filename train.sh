@@ -3,7 +3,7 @@
 #SBATCH --partition=all_usr_prod
 #SBATCH --gres=gpu:1
 #SBATCH --constraint="gpu_RTX5000_16G|gpu_RTX6000_24G|gpu_RTX_A5000_24G|gpu_A40_45G|gpu_L40S_45G|gpu_RTXPro6000B_96G"
-#SBATCH --time=04:00:00
+#SBATCH --time=01:00:00
 #SBATCH --output=/work/cvcs2026/bleedsense/logs/%x_%j.out
 #SBATCH --error=/work/cvcs2026/bleedsense/logs/%x_%j.err
 #SBATCH --account=cvcs2026
