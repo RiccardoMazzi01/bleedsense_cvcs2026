@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import ConcatDataset, DataLoader
 from sklearn.model_selection import StratifiedGroupKFold
 
 from dataset import (
@@ -142,10 +142,11 @@ def run_epoch(model, loader, device, criterion=None, optimizer=None, tracker=Non
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", choices=["hemoset", "rabbani"], required=True)
+    parser.add_argument("--dataset", choices=["hemoset", "rabbani", "joint"], required=True)
     parser.add_argument("--architecture", choices=["unet", "unetplusplus", "deeplabv3plus"], required=True)
     parser.add_argument("--encoder", default="resnet34")
-    parser.add_argument("--fold", type=int, default=0, help="Indice fold (0-4), usato solo con --dataset hemoset")
+    parser.add_argument("--fold", type=int, default=0,
+                         help="Indice fold (0-4), usato con --dataset hemoset o joint")
     parser.add_argument("--augmentation", choices=["light", "aggressive"], default="light",
                          help="Policy di data augmentation per il training (Fase 2)")
     parser.add_argument("--adaptation", choices=["none", "reinhard", "fda"], default="none",
@@ -166,7 +167,7 @@ def main():
     img_size = (args.img_size, args.img_size)
 
     run_name = f"{args.dataset}_{args.architecture}"
-    run_name += f"_fold{args.fold}" if args.dataset == "hemoset" else ""
+    run_name += f"_fold{args.fold}" if args.dataset in ("hemoset", "joint") else ""
     run_name += f"_aug{args.augmentation}" if args.augmentation != "light" else ""
     run_name += f"_adapt{args.adaptation}" if args.adaptation != "none" else ""
 
@@ -176,24 +177,44 @@ def main():
     ckpt_path = os.path.join(ckpt_dir, f"{run_name}_best.pth")
 
     # --- Dati ---
+    is_joint = args.dataset == "joint"
     if args.dataset == "hemoset":
         train_ds, val_ds = build_hemoset_fold(args.data_dir, args.fold, img_size, args.augmentation, args.adaptation)
         cross_ds = build_rabbani_splits(args.data_dir, img_size)[2]  # test split di Rabbani
         cross_name = "rabbani_test"
         indomain_test_ds = val_ds  # per HemoSet il val set del fold e' il proxy in-domain
-    else:
+    elif args.dataset == "rabbani":
         train_ds, val_ds, indomain_test_ds = build_rabbani_splits(
             args.data_dir, img_size, args.augmentation, args.adaptation
         )
         cross_ds = build_hemoset_full(args.data_dir, img_size)  # tutto HemoSet, mai visto in training
         cross_name = "hemoset_full"
+    else:
+        # Fase 4: training congiunto su HemoSet (fold) + Rabbani (train split), valutazione
+        # separata sui due test set held-out (nessun senso di "cross-dataset" qui: il modello
+        # ha visto entrambi i domini in training).
+        hemoset_train_ds, hemoset_eval_ds = build_hemoset_fold(
+            args.data_dir, args.fold, img_size, args.augmentation, args.adaptation
+        )
+        rabbani_train_ds, _, rabbani_eval_ds = build_rabbani_splits(
+            args.data_dir, img_size, args.augmentation, args.adaptation
+        )
+        train_ds = ConcatDataset([hemoset_train_ds, rabbani_train_ds])
+        val_ds = hemoset_eval_ds  # segnale per early stopping/scheduler durante il training
 
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
                                num_workers=args.num_workers, drop_last=True)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
-    indomain_test_loader = DataLoader(indomain_test_ds, batch_size=args.batch_size, shuffle=False,
-                                       num_workers=args.num_workers)
-    cross_loader = DataLoader(cross_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+
+    if is_joint:
+        hemoset_eval_loader = DataLoader(hemoset_eval_ds, batch_size=args.batch_size, shuffle=False,
+                                          num_workers=args.num_workers)
+        rabbani_eval_loader = DataLoader(rabbani_eval_ds, batch_size=args.batch_size, shuffle=False,
+                                          num_workers=args.num_workers)
+    else:
+        indomain_test_loader = DataLoader(indomain_test_ds, batch_size=args.batch_size, shuffle=False,
+                                           num_workers=args.num_workers)
+        cross_loader = DataLoader(cross_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
     # --- Modello ---
     model = get_model(args.architecture, encoder_name=args.encoder).to(device)
@@ -236,14 +257,6 @@ def main():
     # --- Valutazione finale con il best checkpoint ---
     model.load_state_dict(torch.load(ckpt_path, map_location=device))
 
-    indomain_tracker = MetricTracker()
-    run_epoch(model, indomain_test_loader, device, tracker=indomain_tracker)
-    indomain_metrics = indomain_tracker.compute()
-
-    cross_tracker = MetricTracker()
-    run_epoch(model, cross_loader, device, tracker=cross_tracker)
-    cross_metrics = cross_tracker.compute()
-
     result = {
         "run_name": run_name,
         "dataset": args.dataset,
@@ -251,22 +264,47 @@ def main():
         "encoder": args.encoder,
         "augmentation": args.augmentation,
         "adaptation": args.adaptation,
-        "fold": args.fold if args.dataset == "hemoset" else None,
+        "fold": args.fold if args.dataset in ("hemoset", "joint") else None,
         "seed": args.seed,
         "epochs_trained": len(history),
         "best_val_dice": best_dice,
-        "indomain_test": indomain_metrics,
-        "cross_dataset_test": {"target": cross_name, **cross_metrics},
         "history": history,
         "timestamp": datetime.now().isoformat(timespec="seconds"),
     }
+
+    if is_joint:
+        hemoset_tracker = MetricTracker()
+        run_epoch(model, hemoset_eval_loader, device, tracker=hemoset_tracker)
+        hemoset_metrics = hemoset_tracker.compute()
+
+        rabbani_tracker = MetricTracker()
+        run_epoch(model, rabbani_eval_loader, device, tracker=rabbani_tracker)
+        rabbani_metrics = rabbani_tracker.compute()
+
+        result["hemoset_test"] = hemoset_metrics
+        result["rabbani_test"] = rabbani_metrics
+
+        print(f"[{run_name}] FATTO. HemoSet dice={hemoset_metrics['dice']:.4f} "
+              f"| Rabbani dice={rabbani_metrics['dice']:.4f}", flush=True)
+    else:
+        indomain_tracker = MetricTracker()
+        run_epoch(model, indomain_test_loader, device, tracker=indomain_tracker)
+        indomain_metrics = indomain_tracker.compute()
+
+        cross_tracker = MetricTracker()
+        run_epoch(model, cross_loader, device, tracker=cross_tracker)
+        cross_metrics = cross_tracker.compute()
+
+        result["indomain_test"] = indomain_metrics
+        result["cross_dataset_test"] = {"target": cross_name, **cross_metrics}
+
+        print(f"[{run_name}] FATTO. In-domain dice={indomain_metrics['dice']:.4f} "
+              f"| Cross-dataset ({cross_name}) dice={cross_metrics['dice']:.4f}", flush=True)
 
     results_path = os.path.join(args.output_dir, f"{run_name}.json")
     with open(results_path, "w") as f:
         json.dump(result, f, indent=2)
 
-    print(f"[{run_name}] FATTO. In-domain dice={indomain_metrics['dice']:.4f} "
-          f"| Cross-dataset ({cross_name}) dice={cross_metrics['dice']:.4f}", flush=True)
     print(f"[{run_name}] Risultati salvati in {results_path}", flush=True)
 
 
