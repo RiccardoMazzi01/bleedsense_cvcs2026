@@ -1,0 +1,120 @@
+import os
+import glob
+import numpy as np
+import cv2
+import torch
+from torch.utils.data import Dataset
+from sklearn.model_selection import StratifiedGroupKFold, train_test_split
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+
+class MedicalBleedingDataset(Dataset):
+    def __init__(self, image_paths, mask_paths, transform=None):
+        self.image_paths = image_paths
+        self.mask_paths = mask_paths
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        img_path = self.image_paths[idx]
+        mask_path = self.mask_paths[idx]
+
+        image = cv2.imread(img_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+        mask = (mask > 0).astype(np.float32)  # Binarizzazione (0 o 1)
+
+        if self.transform is not None:
+            augmented = self.transform(image=image, mask=mask)
+            image = augmented['image']
+            mask = augmented['mask']
+
+        if isinstance(mask, torch.Tensor):
+            if mask.ndim == 2:
+                mask = mask.unsqueeze(0)
+        else:
+            mask = np.expand_dims(mask, axis=0)
+
+        return image, mask
+
+def get_transforms(img_size=(256, 256)):
+    train_transform = A.Compose([
+        A.Resize(img_size[0], img_size[1]),
+        A.HorizontalFlip(p=0.5),
+        A.RandomBrightnessContrast(p=0.3),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ])
+
+    val_transform = A.Compose([
+        A.Resize(img_size[0], img_size[1]),
+        A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        ToTensorV2(),
+    ])
+
+    return train_transform, val_transform
+
+def load_hemoset_data(hemoset_dir):
+    image_paths = []
+    mask_paths = []
+    groups = []  # ID maiale (es. pig1, pig2...)
+    has_bleeding = []
+
+    pig_folders = sorted(glob.glob(os.path.join(hemoset_dir, "pig*")))
+    for pig_path in pig_folders:
+        pig_id = os.path.basename(pig_path)
+
+        img_dir = os.path.join(pig_path, "images")
+        mask_dir = os.path.join(pig_path, "masks")
+
+        imgs = sorted(glob.glob(os.path.join(img_dir, "*.png")) + glob.glob(os.path.join(img_dir, "*.jpg")))
+        for img_p in imgs:
+            fname = os.path.basename(img_p)
+
+            # Gestione suffisso _mask.png
+            ext = os.path.splitext(fname)[1]
+            mask_fname = fname.replace(ext, f"_mask{ext}")
+            mask_p = os.path.join(mask_dir, mask_fname)
+
+            # Fallback se la maschera ha lo stesso identico nome
+            if not os.path.exists(mask_p):
+                mask_p = os.path.join(mask_dir, fname)
+
+            if os.path.exists(mask_p):
+                image_paths.append(img_p)
+                mask_paths.append(mask_p)
+                groups.append(pig_id)
+
+                m = cv2.imread(mask_p, cv2.IMREAD_GRAYSCALE)
+                has_bleeding.append(1 if (m is not None and (m > 0).any()) else 0)
+
+    return np.array(image_paths), np.array(mask_paths), np.array(groups), np.array(has_bleeding)
+
+def load_rabbani_data(rabbani_dir):
+    img_dir = os.path.join(rabbani_dir, "images")
+    mask_dir = os.path.join(rabbani_dir, "masks")
+
+    image_paths = sorted(glob.glob(os.path.join(img_dir, "*")))
+    mask_paths = sorted(glob.glob(os.path.join(mask_dir, "*")))
+
+    return np.array(image_paths), np.array(mask_paths)
+
+
+def split_rabbani_data(image_paths, mask_paths, val_size=0.15, test_size=0.15, seed=42):
+    """Split fisso train/val/test per Rabbani (nessun gruppo/soggetto disponibile nei metadati).
+
+    Lo stesso seed va usato in tutte le fasi del progetto, cosi' il test set di Rabbani
+    resta identico ovunque (baseline, augmentation, adaptation, joint training).
+    """
+    idx = np.arange(len(image_paths))
+    train_idx, temp_idx = train_test_split(idx, test_size=(val_size + test_size), random_state=seed)
+    rel_test_size = test_size / (val_size + test_size)
+    val_idx, test_idx = train_test_split(temp_idx, test_size=rel_test_size, random_state=seed)
+
+    def subset(indices):
+        return image_paths[indices], mask_paths[indices]
+
+    return subset(train_idx), subset(val_idx), subset(test_idx)
