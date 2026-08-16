@@ -25,7 +25,8 @@ FOLD=${3:-0}
 
 mkdir -p /work/cvcs2026/bleedsense/logs
 
-module load cuda/12.6.3-none-none
+module unload cuda >/dev/null 2>&1 || true
+module load cuda/12.6.3
 source /homes/rmazzi/cvcs2026/venv/bin/activate
 
 cd /work/cvcs2026/bleedsense
