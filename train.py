@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import ConcatDataset, DataLoader
+from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler
 from sklearn.model_selection import StratifiedGroupKFold
 
 from dataset import (
@@ -151,6 +151,9 @@ def main():
                          help="Policy di data augmentation per il training (Fase 2)")
     parser.add_argument("--adaptation", choices=["none", "reinhard", "fda"], default="none",
                          help="Appearance/domain adaptation verso il dominio target (Fase 3)")
+    parser.add_argument("--joint-sampling", choices=["natural", "balanced"], default="natural",
+                         help="Solo con --dataset joint: 'balanced' pesca meta' batch da ciascun dominio "
+                              "indipendentemente dalla sua dimensione (WeightedRandomSampler)")
     parser.add_argument("--data-dir", default="/work/cvcs2026/bleedsense/datasets")
     parser.add_argument("--output-dir", default="/work/cvcs2026/bleedsense/results")
     parser.add_argument("--epochs", type=int, default=40)
@@ -170,6 +173,7 @@ def main():
     run_name += f"_fold{args.fold}" if args.dataset in ("hemoset", "joint") else ""
     run_name += f"_aug{args.augmentation}" if args.augmentation != "light" else ""
     run_name += f"_adapt{args.adaptation}" if args.adaptation != "none" else ""
+    run_name += "_balanced" if args.dataset == "joint" and args.joint_sampling == "balanced" else ""
 
     os.makedirs(args.output_dir, exist_ok=True)
     ckpt_dir = os.path.join(args.output_dir, "checkpoints")
@@ -202,8 +206,18 @@ def main():
         train_ds = ConcatDataset([hemoset_train_ds, rabbani_train_ds])
         val_ds = hemoset_eval_ds  # segnale per early stopping/scheduler durante il training
 
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True,
-                               num_workers=args.num_workers, drop_last=True)
+    sampler = None
+    if is_joint and args.joint_sampling == "balanced":
+        # Peso per immagine inversamente proporzionale alla dimensione del proprio dominio:
+        # ogni dominio ha ~50% di probabilita' di essere pescato in ciascun batch,
+        # indipendentemente da quante immagini contribuisce (corregge lo sbilanciamento
+        # osservato in Fase 4, dove HemoSet pesava ~59% solo perche' piu' numeroso).
+        n_hemoset, n_rabbani = len(hemoset_train_ds), len(rabbani_train_ds)
+        weights = [1.0 / n_hemoset] * n_hemoset + [1.0 / n_rabbani] * n_rabbani
+        sampler = WeightedRandomSampler(weights, num_samples=len(train_ds), replacement=True)
+
+    train_loader = DataLoader(train_ds, batch_size=args.batch_size, num_workers=args.num_workers,
+                               drop_last=True, sampler=sampler, shuffle=(sampler is None))
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
     if is_joint:
@@ -264,6 +278,7 @@ def main():
         "encoder": args.encoder,
         "augmentation": args.augmentation,
         "adaptation": args.adaptation,
+        "joint_sampling": args.joint_sampling if args.dataset == "joint" else None,
         "fold": args.fold if args.dataset in ("hemoset", "joint") else None,
         "seed": args.seed,
         "epochs_trained": len(history),

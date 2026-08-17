@@ -45,8 +45,9 @@ def rabbani_baseline(arch):
     return {m: [run["indomain_test"][m]] for m in METRICS}
 
 
-def joint_metrics(arch):
-    runs = [load(f"joint_{arch}_fold{i}") for i in range(5)]
+def joint_metrics(arch, sampling="natural"):
+    suffix = "" if sampling == "natural" else f"_{sampling}"
+    runs = [load(f"joint_{arch}_fold{i}{suffix}") for i in range(5)]
     runs = [r for r in runs if r is not None]
     if not runs:
         return None, None
@@ -60,16 +61,21 @@ def main():
     for arch in ARCHITECTURES:
         h_base = hemoset_baseline(arch)
         r_base = rabbani_baseline(arch)
-        h_joint, r_joint = joint_metrics(arch)
+        h_joint, r_joint = joint_metrics(arch, "natural")
+        h_joint_bal, r_joint_bal = joint_metrics(arch, "balanced")
 
         if h_base is not None:
             rows.append(("HemoSet test", arch, "single-source (Fase 1)", h_base))
         if h_joint is not None:
-            rows.append(("HemoSet test", arch, "joint (Fase 4)", h_joint))
+            rows.append(("HemoSet test", arch, "joint naturale (Fase 4)", h_joint))
+        if h_joint_bal is not None:
+            rows.append(("HemoSet test", arch, "joint bilanciato (Fase 4b)", h_joint_bal))
         if r_base is not None:
             rows.append(("Rabbani test", arch, "single-source (Fase 1)", r_base))
         if r_joint is not None:
-            rows.append(("Rabbani test", arch, "joint (Fase 4)", r_joint))
+            rows.append(("Rabbani test", arch, "joint naturale (Fase 4)", r_joint))
+        if r_joint_bal is not None:
+            rows.append(("Rabbani test", arch, "joint bilanciato (Fase 4b)", r_joint_bal))
 
     if not rows:
         print("Nessun risultato trovato in", RESULTS_DIR)
@@ -87,7 +93,7 @@ def main():
 
     out_path = os.path.join(RESULTS_DIR, "phase4_joint_summary.md")
     with open(out_path, "w") as f:
-        f.write("# Fase 4 - Joint training vs single-source (per dominio di test)\n\n")
+        f.write("# Fase 4/4b - Joint training (naturale vs bilanciato) vs single-source\n\n")
         f.write("Media +/- deviazione standard sui 5 fold HemoSet; Rabbani single-source e' un run singolo.\n\n")
         f.write(table_md + "\n")
 
