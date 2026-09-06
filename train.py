@@ -65,17 +65,18 @@ class DiceBCELoss(nn.Module):
         return self.bce_weight * bce + (1 - self.bce_weight) * dice_loss
 
 
-def build_hemoset_fold(data_dir, fold, img_size, augmentation="light", adaptation="none"):
+def build_hemoset_fold(data_dir, fold, img_size, augmentation="light", adaptation="none", use_blood_index=False):
     images, masks, groups, labels = load_hemoset_data(os.path.join(data_dir, "hemoset"))
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=SPLIT_SEED)
     splits = list(sgkf.split(images, labels, groups))
     train_idx, val_idx = splits[fold]
 
-    train_tf, _ = AUGMENTATION_TRANSFORMS[augmentation](img_size)
-    _, val_tf = get_transforms(img_size)  # valutazione sempre senza augmentation, per confrontabilita'
+    train_tf, _ = AUGMENTATION_TRANSFORMS[augmentation](img_size, use_blood_index=use_blood_index)
+    _, val_tf = get_transforms(img_size, use_blood_index=use_blood_index)  # valutazione sempre senza augmentation, per confrontabilita'
 
     if adaptation == "none":
-        train_ds = MedicalBleedingDataset(images[train_idx], masks[train_idx], transform=train_tf)
+        train_ds = MedicalBleedingDataset(images[train_idx], masks[train_idx], transform=train_tf,
+                                           use_blood_index=use_blood_index)
     else:
         target_pool = get_rabbani_train_pool(data_dir, seed=SPLIT_SEED)
         train_ds = AdaptedBleedingDataset(
@@ -83,26 +84,28 @@ def build_hemoset_fold(data_dir, fold, img_size, augmentation="light", adaptatio
             ADAPTATION_FUNCTIONS[adaptation], transform=train_tf, work_size=img_size,
         )
 
-    val_ds = MedicalBleedingDataset(images[val_idx], masks[val_idx], transform=val_tf)
+    val_ds = MedicalBleedingDataset(images[val_idx], masks[val_idx], transform=val_tf,
+                                     use_blood_index=use_blood_index)
     return train_ds, val_ds
 
 
-def build_hemoset_full(data_dir, img_size):
+def build_hemoset_full(data_dir, img_size, use_blood_index=False):
     images, masks, _, _ = load_hemoset_data(os.path.join(data_dir, "hemoset"))
-    _, val_tf = get_transforms(img_size)
-    return MedicalBleedingDataset(images, masks, transform=val_tf)
+    _, val_tf = get_transforms(img_size, use_blood_index=use_blood_index)
+    return MedicalBleedingDataset(images, masks, transform=val_tf, use_blood_index=use_blood_index)
 
 
-def build_rabbani_splits(data_dir, img_size, augmentation="light", adaptation="none"):
+def build_rabbani_splits(data_dir, img_size, augmentation="light", adaptation="none", use_blood_index=False):
     images, masks = load_rabbani_data(os.path.join(data_dir, "rabbani"))
     (train_img, train_mask), (val_img, val_mask), (test_img, test_mask) = split_rabbani_data(
         images, masks, seed=SPLIT_SEED
     )
-    train_tf, _ = AUGMENTATION_TRANSFORMS[augmentation](img_size)
-    _, val_tf = get_transforms(img_size)  # valutazione sempre senza augmentation, per confrontabilita'
+    train_tf, _ = AUGMENTATION_TRANSFORMS[augmentation](img_size, use_blood_index=use_blood_index)
+    _, val_tf = get_transforms(img_size, use_blood_index=use_blood_index)  # valutazione sempre senza augmentation, per confrontabilita'
 
     if adaptation == "none":
-        train_ds = MedicalBleedingDataset(train_img, train_mask, transform=train_tf)
+        train_ds = MedicalBleedingDataset(train_img, train_mask, transform=train_tf,
+                                           use_blood_index=use_blood_index)
     else:
         target_pool = get_hemoset_all_images(data_dir)
         train_ds = AdaptedBleedingDataset(
@@ -110,8 +113,8 @@ def build_rabbani_splits(data_dir, img_size, augmentation="light", adaptation="n
             ADAPTATION_FUNCTIONS[adaptation], transform=train_tf, work_size=img_size,
         )
 
-    val_ds = MedicalBleedingDataset(val_img, val_mask, transform=val_tf)
-    test_ds = MedicalBleedingDataset(test_img, test_mask, transform=val_tf)
+    val_ds = MedicalBleedingDataset(val_img, val_mask, transform=val_tf, use_blood_index=use_blood_index)
+    test_ds = MedicalBleedingDataset(test_img, test_mask, transform=val_tf, use_blood_index=use_blood_index)
     return train_ds, val_ds, test_ds
 
 
@@ -154,6 +157,10 @@ def main():
     parser.add_argument("--joint-sampling", choices=["natural", "balanced"], default="natural",
                          help="Solo con --dataset joint: 'balanced' pesca meta' batch da ciascun dominio "
                               "indipendentemente dalla sua dimensione (WeightedRandomSampler)")
+    parser.add_argument("--use-blood-index", action="store_true",
+                         help="Aggiunge un 4o canale di input R/(R+G+B), pensato per essere meno "
+                              "sensibile a differenze di camera/illuminazione tra i due dataset. "
+                              "Non ancora supportato insieme a --adaptation diversa da 'none'.")
     parser.add_argument("--data-dir", default="/work/cvcs2026/bleedsense/datasets")
     parser.add_argument("--output-dir", default="/work/cvcs2026/bleedsense/results")
     parser.add_argument("--epochs", type=int, default=40)
@@ -165,6 +172,9 @@ def main():
     parser.add_argument("--patience", type=int, default=8, help="Early stopping su Dice di validazione")
     args = parser.parse_args()
 
+    if args.use_blood_index and args.adaptation != "none":
+        raise ValueError("--use-blood-index non e' ancora supportato insieme a --adaptation diversa da 'none'")
+
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     img_size = (args.img_size, args.img_size)
@@ -174,6 +184,7 @@ def main():
     run_name += f"_aug{args.augmentation}" if args.augmentation != "light" else ""
     run_name += f"_adapt{args.adaptation}" if args.adaptation != "none" else ""
     run_name += "_balanced" if args.dataset == "joint" and args.joint_sampling == "balanced" else ""
+    run_name += "_bloodindex" if args.use_blood_index else ""
 
     os.makedirs(args.output_dir, exist_ok=True)
     ckpt_dir = os.path.join(args.output_dir, "checkpoints")
@@ -183,25 +194,27 @@ def main():
     # --- Dati ---
     is_joint = args.dataset == "joint"
     if args.dataset == "hemoset":
-        train_ds, val_ds = build_hemoset_fold(args.data_dir, args.fold, img_size, args.augmentation, args.adaptation)
-        cross_ds = build_rabbani_splits(args.data_dir, img_size)[2]  # test split di Rabbani
+        train_ds, val_ds = build_hemoset_fold(args.data_dir, args.fold, img_size, args.augmentation, args.adaptation,
+                                               use_blood_index=args.use_blood_index)
+        cross_ds = build_rabbani_splits(args.data_dir, img_size, use_blood_index=args.use_blood_index)[2]  # test split di Rabbani
         cross_name = "rabbani_test"
         indomain_test_ds = val_ds  # per HemoSet il val set del fold e' il proxy in-domain
     elif args.dataset == "rabbani":
         train_ds, val_ds, indomain_test_ds = build_rabbani_splits(
-            args.data_dir, img_size, args.augmentation, args.adaptation
+            args.data_dir, img_size, args.augmentation, args.adaptation, use_blood_index=args.use_blood_index
         )
-        cross_ds = build_hemoset_full(args.data_dir, img_size)  # tutto HemoSet, mai visto in training
+        cross_ds = build_hemoset_full(args.data_dir, img_size, use_blood_index=args.use_blood_index)  # tutto HemoSet, mai visto in training
         cross_name = "hemoset_full"
     else:
         # Fase 4: training congiunto su HemoSet (fold) + Rabbani (train split), valutazione
         # separata sui due test set held-out (nessun senso di "cross-dataset" qui: il modello
         # ha visto entrambi i domini in training).
         hemoset_train_ds, hemoset_eval_ds = build_hemoset_fold(
-            args.data_dir, args.fold, img_size, args.augmentation, args.adaptation
+            args.data_dir, args.fold, img_size, args.augmentation, args.adaptation,
+            use_blood_index=args.use_blood_index
         )
         rabbani_train_ds, _, rabbani_eval_ds = build_rabbani_splits(
-            args.data_dir, img_size, args.augmentation, args.adaptation
+            args.data_dir, img_size, args.augmentation, args.adaptation, use_blood_index=args.use_blood_index
         )
         train_ds = ConcatDataset([hemoset_train_ds, rabbani_train_ds])
         val_ds = hemoset_eval_ds  # segnale per early stopping/scheduler durante il training
@@ -231,7 +244,8 @@ def main():
         cross_loader = DataLoader(cross_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
     # --- Modello ---
-    model = get_model(args.architecture, encoder_name=args.encoder).to(device)
+    in_channels = 4 if args.use_blood_index else 3
+    model = get_model(args.architecture, encoder_name=args.encoder, in_channels=in_channels).to(device)
     criterion = DiceBCELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3)
@@ -279,6 +293,7 @@ def main():
         "augmentation": args.augmentation,
         "adaptation": args.adaptation,
         "joint_sampling": args.joint_sampling if args.dataset == "joint" else None,
+        "use_blood_index": args.use_blood_index,
         "fold": args.fold if args.dataset in ("hemoset", "joint") else None,
         "seed": args.seed,
         "epochs_trained": len(history),

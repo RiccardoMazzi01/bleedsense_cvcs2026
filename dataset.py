@@ -9,11 +9,24 @@ from sklearn.model_selection import StratifiedGroupKFold, train_test_split
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
+def compute_blood_index(image_rgb):
+    """Canale extra derivato da RGB, pensato per essere meno sensibile a differenze di
+    camera/illuminazione tra HemoSet e Rabbani rispetto ai canali RGB grezzi: rapporto
+    R/(R+G+B) (excess-red-like index, in [0, 1]), usato in letteratura per evidenziare
+    regioni ematiche in modo relativamente invariante all'esposizione.
+    """
+    img = image_rgb.astype(np.float32)
+    r, g, b = img[..., 0], img[..., 1], img[..., 2]
+    index = r / (r + g + b + 1e-6)
+    return index.astype(np.float32)
+
+
 class MedicalBleedingDataset(Dataset):
-    def __init__(self, image_paths, mask_paths, transform=None):
+    def __init__(self, image_paths, mask_paths, transform=None, use_blood_index=False):
         self.image_paths = image_paths
         self.mask_paths = mask_paths
         self.transform = transform
+        self.use_blood_index = use_blood_index
 
     def __len__(self):
         return len(self.image_paths)
@@ -28,8 +41,14 @@ class MedicalBleedingDataset(Dataset):
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
         mask = (mask > 0).astype(np.float32)  # Binarizzazione (0 o 1)
 
+        blood_index = compute_blood_index(image) if self.use_blood_index else None
+
         if self.transform is not None:
-            augmented = self.transform(image=image, mask=mask)
+            if blood_index is not None:
+                augmented = self.transform(image=image, mask=mask, blood_index=blood_index)
+                blood_index = augmented['blood_index']
+            else:
+                augmented = self.transform(image=image, mask=mask)
             image = augmented['image']
             mask = augmented['mask']
 
@@ -39,22 +58,37 @@ class MedicalBleedingDataset(Dataset):
         else:
             mask = np.expand_dims(mask, axis=0)
 
+        if blood_index is not None:
+            if not isinstance(blood_index, torch.Tensor):
+                blood_index = torch.from_numpy(blood_index)
+            blood_index = blood_index.to(image.dtype)
+            # riscalato da [0, 1] a circa [-2, 2], stesso ordine di grandezza dei canali
+            # RGB normalizzati con le statistiche ImageNet usate sopra
+            blood_index = (blood_index - 0.5) * 4.0
+            if blood_index.ndim == 2:
+                blood_index = blood_index.unsqueeze(0)
+            image = torch.cat([image, blood_index], dim=0)
+
         return image, mask
 
-def get_transforms(img_size=(256, 256)):
+def get_transforms(img_size=(256, 256), use_blood_index=False):
+    # blood_index e' registrato come target di tipo 'mask': riceve solo le trasformazioni
+    # geometriche (resize/flip), non quelle di colore, dato che non e' un canale RGB.
+    additional_targets = {"blood_index": "mask"} if use_blood_index else None
+
     train_transform = A.Compose([
         A.Resize(img_size[0], img_size[1]),
         A.HorizontalFlip(p=0.5),
         A.RandomBrightnessContrast(p=0.3),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
-    ])
+    ], additional_targets=additional_targets)
 
     val_transform = A.Compose([
         A.Resize(img_size[0], img_size[1]),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
-    ])
+    ], additional_targets=additional_targets)
 
     return train_transform, val_transform
 
@@ -167,7 +201,7 @@ def split_rabbani_data(image_paths, mask_paths, val_size=0.15, test_size=0.15, s
     return subset(train_idx), subset(val_idx), subset(test_idx)
 
 
-def get_aggressive_transforms(img_size=(256, 256)):
+def get_aggressive_transforms(img_size=(256, 256), use_blood_index=False):
     """Augmentation 'aggressive' per la Fase 2 (Su et al., AAAI 2023 / setup chirurgico:
     luminosita'/contrasto, hue/saturation, gamma, blur, noise, compressione).
 
@@ -175,6 +209,8 @@ def get_aggressive_transforms(img_size=(256, 256)):
     comparabile tra gli esperimenti 'light' (Fase 1) e 'aggressive' (Fase 2): cambia solo
     cosa vede il modello in training, non come viene misurato.
     """
+    additional_targets = {"blood_index": "mask"} if use_blood_index else None
+
     train_transform = A.Compose([
         A.Resize(img_size[0], img_size[1]),
         A.HorizontalFlip(p=0.5),
@@ -188,13 +224,13 @@ def get_aggressive_transforms(img_size=(256, 256)):
         A.ImageCompression(p=0.3),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
-    ])
+    ], additional_targets=additional_targets)
 
     val_transform = A.Compose([
         A.Resize(img_size[0], img_size[1]),
         A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         ToTensorV2(),
-    ])
+    ], additional_targets=additional_targets)
 
     return train_transform, val_transform
 
