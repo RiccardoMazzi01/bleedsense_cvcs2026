@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>BleedSense — Report finale CVCS</title>
+<style>
+  @page { size: A4; margin: 20mm 18mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    color: #0b0b0b;
+    background: #fff;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+    line-height: 1.5;
+    font-size: 14px;
+  }
+  h1 { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; font-size: 1.5rem; margin-bottom: 2px; line-height: 1.3; }
+  .subtitle { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #52514e; font-size: 0.95rem; margin: 6px 0 2px; }
+  .authors { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; font-size: 0.9rem; color: #333; margin-bottom: 18px; }
+  h2 {
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 1.05rem;
+    margin-top: 22px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1.5px solid #2a78d6;
+    color: #0b0b0b;
+    break-after: avoid;
+  }
+  h3 {
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 0.95rem;
+    margin-top: 16px;
+    margin-bottom: 6px;
+    color: #184f95;
+    break-after: avoid;
+  }
+  p { margin: 0 0 10px; text-align: justify; }
+  .abstract {
+    background: #f9f9f7;
+    border-left: 3px solid #2a78d6;
+    padding: 10px 16px;
+    font-size: 0.92rem;
+    margin-bottom: 4px;
+  }
+  .abstract p { margin: 0; }
+  strong { color: #0b0b0b; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 0.78rem;
+    margin: 10px 0 6px;
+    break-inside: avoid;
+  }
+  th, td {
+    border: 1px solid #d8d7d0;
+    padding: 4px 6px;
+    text-align: right;
+  }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { background: #2a78d6; color: #fff; font-weight: 600; }
+  tbody tr:nth-child(even) { background: #f9f9f7; }
+  tbody tr:last-child { font-weight: 700; background: #eaf2fc; }
+  .footnote { font-size: 0.78rem; color: #52514e; margin-top: -2px; margin-bottom: 12px; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  ul, ol { margin: 4px 0 10px; padding-left: 22px; }
+  li { margin-bottom: 4px; }
+  .figure { break-inside: avoid; margin: 14px 0 6px; text-align: center; }
+  .figure svg { max-width: 100%; height: auto; }
+  .figure-caption { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; font-size: 0.78rem; color: #52514e; margin-top: 4px; }
+  .biblio { font-size: 0.85rem; }
+  .biblio ol { padding-left: 20px; }
+  .biblio li { margin-bottom: 6px; }
+  code { font-family: "Courier New", monospace; font-size: 0.85em; background: #f1f1ee; padding: 1px 4px; border-radius: 2px; }
+  hr { border: none; border-top: 1px solid #e1e0d9; margin: 18px 0; }
+</style>
+</head>
+<body>
+
+<h1>BleedSense — Robustezza cross-dataset per la segmentazione del sangue in chirurgia robotica</h1>
+<p class="subtitle">Report finale — Corso di Computer Vision and Cognitive Systems (CVCS), A.A. 2025/2026, UNIMORE</p>
+<p class="authors">Riccardo Mazzi (294437) — Supervisione: Dott.ssa Livia Del Gaudio (AImageLab, progetto TRAMIS)</p>
+
+<div class="abstract">
+<p><strong>Abstract.</strong> La gestione automatica dell'emostasi in chirurgia robotica richiede la segmentazione affidabile del sangue nel campo operatorio. I modelli allenati su un singolo dataset chirurgico generalizzano tuttavia male su altri dataset con caratteristiche visive diverse. Questo lavoro studia il problema su due dataset pubblici, <strong>HemoSet</strong> (chirurgia robotica su modello suino) e <strong>Rabbani et al.</strong> (laparoscopia ginecologica su umani), confermando un <strong>domain gap asimmetrico</strong> già osservato in lavori precedenti del gruppo di ricerca, e confronta sistematicamente sei famiglie di strategie per ridurlo: data augmentation aggressiva, appearance/domain adaptation (Reinhard, FDA), joint training multi-dominio (con e senza bilanciamento), ensembling di più architetture, un canale di input invariante all'illuminazione e style-mixing a livello di feature (MixStyle), oltre a una ricalibrazione delle statistiche BatchNorm a inferenza. Su tre architetture standard (UNet, UNet++, DeepLabV3+, encoder <code>resnet34</code>), la strategia più efficace è la <strong>data augmentation aggressiva</strong>, che migliora la robustezza cross-dataset in entrambe le direzioni senza costi apprezzabili in-domain; combinata con un <strong>ensemble delle tre architetture</strong>, produce il miglior risultato complessivo. Le tre estensioni più originali tentate in un secondo momento non hanno migliorato ulteriormente questo risultato, ma la loro analisi fornisce indicazioni utili sul motivo per cui interventi più mirati falliscono in questo setting.</p>
+</div>
+
+<h2>1. Introduzione e motivazione</h2>
+<p>L'automazione della gestione dell'emostasi in chirurgia robotica — l'identificazione e il controllo del sanguinamento durante l'intervento — richiede come primo passo la segmentazione affidabile del sangue nel campo visivo endoscopico. Questo progetto si inserisce nell'iniziativa di ricerca <strong>TRAMIS</strong>, orientata alla rilevazione in tempo reale del sanguinamento in chirurgia robotica; poiché al momento di questo lavoro non erano ancora disponibili dati chirurgici reali annotati del progetto, lo studio è stato condotto su due dataset pubblici di riferimento nel dominio, usati come proxy: <strong>HemoSet</strong> (Miao et al., ISMR 2024 — sanguinamenti indotti su modello suino, 962 coppie immagine-maschera, 10 soggetti) e <strong>Rabbani et al.</strong> (MIDL 2022 — laparoscopia ginecologica su umani, 751 immagini annotate).</p>
+<p>Un lavoro precedente del gruppo di ricerca (Giusti &amp; Marzo, report CVCS 2025/2026, Sezione 2) aveva osservato un calo di performance <strong>asimmetrico</strong> quando un modello allenato su uno dei due dataset viene valutato sull'altro: <strong>HemoSet → Rabbani</strong> mostra un forte calo generale delle performance, mentre <strong>Rabbani → HemoSet</strong> mostra un aumento marcato dei falsi positivi (regioni non ematiche segmentate come sangue).</p>
+<p><strong>Obiettivo del progetto</strong>: quantificare questa asimmetria in modo rigoroso e riproducibile, e studiare sistematicamente quali strategie aumentano effettivamente la robustezza cross-dataset dei modelli di segmentazione, confrontando più condizioni sperimentali senza vincolo di convergere su un'unica soluzione.</p>
+
+<h2>2. Lavori correlati</h2>
+<ul>
+<li><strong>Miao et al.</strong>, "HemoSet: The First Blood Segmentation Dataset for Automation of Hemostasis Management", ISMR 2024 — dataset HemoSet; benchmark di modelli standard, metriche IoU/F1/Hausdorff Distance.</li>
+<li><strong>Rabbani et al.</strong>, "Video-based Computer-aided Laparoscopic Bleeding Management...", MIDL 2022 — dataset e sistema di segmentazione con adversarial domain adaptation; metriche IoU e F-Score.</li>
+<li><strong>Yang &amp; Soatto</strong>, "FDA: Fourier Domain Adaptation for Semantic Segmentation", CVPR 2020 — scambio delle componenti a bassa frequenza nello spettro di Fourier, usato come appearance adaptation (Sez. 4.2).</li>
+<li><strong>Reinhard et al.</strong>, "Color Transfer between Images", IEEE CG&amp;A 2001 — color transfer statistico in L*a*b*, secondo metodo di appearance adaptation.</li>
+<li><strong>Zhou et al.</strong>, "Domain Generalization with MixStyle", ICLR 2021 — style mixing a livello di feature, usato come estensione (Sez. 5.2).</li>
+<li><strong>Li et al.</strong>, "Revisiting Batch Normalization For Practical Domain Adaptation" (AdaBN), 2016 — ricalibrazione BatchNorm a inferenza, usata come estensione (Sez. 5.2).</li>
+<li><strong>Su et al.</strong>, AAAI 2023 — domain generalization single-source tramite augmentation.</li>
+<li><strong>Giusti &amp; Marzo</strong>, report CVCS 2025/2026 — prima quantificazione del domain gap asimmetrico (Dice zero-shot: HemoSet→Rabbani 0.29, Rabbani→HemoSet 0.56), coerente con Sez. 4.1 nonostante split/iperparametri diversi.</li>
+</ul>
+
+<h2>3. Approccio</h2>
+<h3>3.1 Dataset e split</h3>
+<p><strong>HemoSet</strong>: 962 coppie immagine-maschera, 10 soggetti (pig). Split <strong>Stratified Group K-Fold</strong> a 5 fold, con il soggetto come gruppo. <strong>Rabbani</strong>: 751 immagini/maschere, split fisso <strong>70/15/15</strong> (seed 42), riusato identico in tutte le fasi.</p>
+<h3>3.2 Architetture e protocollo di training</h3>
+<p>Tre architetture standard via <code>segmentation_models_pytorch</code>, stesso encoder <code>resnet34</code>: <strong>UNet</strong>, <strong>UNet++</strong>, <strong>DeepLabV3+</strong>. Loss Dice+BCE, AdamW (lr 1e-4), <code>ReduceLROnPlateau</code>, batch size 8, immagini 256×256, dataset completo per split. Early stopping su Dice di validazione (patience 8, cap 40 epoche) — verificato empiricamente su tutti gli 87 run di Fasi 1-4 che il budget fosse sufficiente (solo 2/87 hanno raggiunto il cap, con residuo &lt;0.01 Dice). Stessa configurazione identica per ogni condizione confrontata, per isolare la sola variabile in esame.</p>
+<h3>3.3 Metriche e protocollo di valutazione</h3>
+<p>Dice, IoU, Precision, Recall, F1, <strong>HD95</strong> — l'insieme copre per intero le metriche dei paper originali di entrambi i dataset. Un modello allenato su HemoSet è valutato in-domain sul fold di validazione e cross-dataset sul test set fisso di Rabbani; un modello allenato su Rabbani è valutato in-domain sul proprio test set e cross-dataset su tutto HemoSet (mai visto in training).</p>
+
+<h2>4. Risultati</h2>
+<h3>4.1 Baseline e asimmetria del domain gap</h3>
+<p>Le tre architetture allenate separatamente sui due dataset (augmentation minima) confermano e quantificano l'asimmetria: <strong>HemoSet→Rabbani</strong> il Dice medio crolla di circa il 70% relativo (0.745 → 0.217), con HD95 che passa da ~29px a ~130px, per un crollo del <strong>recall</strong> (0.76→0.19): il modello diventa troppo conservativo sul dominio target. <strong>Rabbani→HemoSet</strong> il calo è più contenuto (0.684 → 0.585) ma la <strong>precision</strong> crolla (0.74→0.50) mentre il recall resta alto — coerente con l'osservazione originale sui falsi positivi. Le tre architetture si comportano in modo molto simile in ogni condizione: nessuna risolve da sola il domain gap.</p>
+
+<h3>4.2 Data augmentation, appearance adaptation, joint training</h3>
+<p>Un'augmentation "aggressiva" (hue/saturation, gamma, blur, rumore, compressione JPEG) <strong>migliora la robustezza cross-dataset su tutte e tre le architetture in entrambe le direzioni</strong>, quasi senza costo in-domain (HemoSet→Rabbani: 0.217→0.321, +48% relativo; Rabbani→HemoSet: 0.585→0.601). Reinhard color transfer e Fourier Domain Adaptation, applicati con immagini non annotate del dominio target, aiutano la direzione più critica (HemoSet→Rabbani: →0.263 e →0.242 rispettivamente) ma <strong>a un costo in-domain non trascurabile</strong> (Rabbani in-domain: 0.684→0.611 con Reinhard) e non battono l'augmentation aggressiva — probabilmente perché, a differenza dell'augmentation (probabilistica), l'adaptation qui è sempre attiva: il modello non vede mai l'aspetto "pulito" del proprio dominio sorgente durante il training.</p>
+<p>Il <strong>joint training</strong> (unione di HemoSet e Rabbani, test set held-out separati) non è una soluzione: nessun beneficio sistematico su HemoSet, calo sistematico su Rabbani (0.684→0.636) dovuto allo sbilanciamento tra le dimensioni dei due dataset (~59%/41%). Un campionamento bilanciato (<code>WeightedRandomSampler</code>) recupera solo metà del calo (→0.656), senza rendere la strategia competitiva.</p>
+
+<h3>4.3 Ensemble delle tre architetture</h3>
+<p>Come contributo originale, si è ensemblato — a costo computazionale nullo (media delle probabilità sigmoid dei checkpoint già allenati con augmentation aggressiva) — le predizioni delle tre architetture. Il risultato batte il migliore dei tre modelli singoli su <strong>tutte e quattro</strong> le condizioni testate (es. HemoSet→Rabbani: 0.337 il migliore singolo → 0.343; Rabbani→HemoSet: 0.615 → 0.623).</p>
+
+<h3>4.4 Sintesi comparativa</h3>
+<p>Media sulle tre architetture per ciascuna strategia (dettaglio completo per architettura nei materiali supplementari):</p>
+
+<table>
+<thead><tr><th>Strategia</th><th>HemoSet (in-domain)</th><th>Rabbani (in-domain)</th><th>HemoSet→Rabbani (cross)</th><th>Rabbani→HemoSet (cross)</th></tr></thead>
+<tbody>
+<tr><td>Baseline (source-only)</td><td>0.745</td><td>0.684</td><td>0.217</td><td>0.585</td></tr>
+<tr><td>Augmentation aggressiva</td><td>0.747</td><td>0.681</td><td>0.321</td><td>0.601</td></tr>
+<tr><td>Appearance adaptation (Reinhard)</td><td>0.719</td><td>0.611</td><td>0.263</td><td>0.577</td></tr>
+<tr><td>Appearance adaptation (FDA)</td><td>0.720</td><td>0.675</td><td>0.242</td><td>0.550</td></tr>
+<tr><td>Joint training naturale</td><td>0.742</td><td>0.636</td><td>n/a*</td><td>n/a*</td></tr>
+<tr><td>Joint training bilanciato</td><td>0.739</td><td>0.656</td><td>n/a*</td><td>n/a*</td></tr>
+<tr><td>Ensemble 3 architetture (su aggressiva)</td><td>0.770</td><td>0.706</td><td>0.343</td><td>0.623</td></tr>
+</tbody>
+</table>
+<p class="footnote">* il joint training è valutato in-domain su entrambi i test set, non esiste una condizione "cross-dataset" comparabile per questa riga.</p>
+
+<div class="figure">
+<svg viewBox="0 0 760 365" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Grafico a barre: Dice medio per strategia e condizione di valutazione">
+  <text x="380" y="14" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="11" font-weight="600" fill="#0b0b0b">Dice medio per strategia e condizione di valutazione (media sulle 3 architetture)</text>
+
+  <!-- legenda riga 1 -->
+  <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="8.5" fill="#333230">
+    <rect x="40" y="22" width="10" height="10" rx="2" fill="#2a78d6"/><text x="53" y="30.5">Baseline</text>
+    <rect x="150" y="22" width="10" height="10" rx="2" fill="#eb6834"/><text x="163" y="30.5">Aug. aggressiva</text>
+    <rect x="290" y="22" width="10" height="10" rx="2" fill="#1baf7a" stroke="rgba(11,11,11,0.15)"/><text x="303" y="30.5">Reinhard</text>
+    <rect x="400" y="22" width="10" height="10" rx="2" fill="#eda100" stroke="rgba(11,11,11,0.15)"/><text x="413" y="30.5">FDA</text>
+    <rect x="470" y="22" width="10" height="10" rx="2" fill="#e87ba4" stroke="rgba(11,11,11,0.15)"/><text x="483" y="30.5">Joint naturale</text>
+    <rect x="610" y="22" width="10" height="10" rx="2" fill="#008300"/><text x="623" y="30.5">Joint bilanciato</text>
+    <rect x="40" y="38" width="10" height="10" rx="2" fill="#4a3aa7"/><text x="53" y="46.5">Ensemble (3 architetture)</text>
+  </g>
+
+  <!-- gridlines + y labels -->
+  <g stroke="#e1e0d9" stroke-width="1">
+    <line x1="35" y1="55" x2="760" y2="55"/>
+    <line x1="35" y1="120" x2="760" y2="120"/>
+    <line x1="35" y1="185" x2="760" y2="185"/>
+    <line x1="35" y1="250" x2="760" y2="250"/>
+  </g>
+  <line x1="35" y1="315" x2="760" y2="315" stroke="#c3c2b7" stroke-width="1.2"/>
+  <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="8" fill="#898781" text-anchor="end">
+    <text x="32" y="318">0</text>
+    <text x="32" y="253">0.2</text>
+    <text x="32" y="188">0.4</text>
+    <text x="32" y="123">0.6</text>
+    <text x="32" y="58">0.8</text>
+  </g>
+
+  <!-- Group 0: HemoSet in-domain -->
+  <g>
+    <rect x="42.5" y="72.9" width="20" height="242.1" rx="2" fill="#2a78d6"/>
+    <text x="52.5" y="68.9" text-anchor="middle" font-size="8" fill="#0b0b0b" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif">0.745</text>
+    <rect x="67.5" y="72.2" width="20" height="242.8" rx="2" fill="#eb6834"/>
+    <rect x="92.5" y="81.1" width="20" height="233.9" rx="2" fill="#1baf7a" stroke="rgba(11,11,11,0.15)"/>
+    <rect x="117.5" y="81.0" width="20" height="234.0" rx="2" fill="#eda100" stroke="rgba(11,11,11,0.15)"/>
+    <rect x="142.5" y="73.8" width="20" height="241.2" rx="2" fill="#e87ba4" stroke="rgba(11,11,11,0.15)"/>
+    <rect x="167.5" y="74.8" width="20" height="240.2" rx="2" fill="#008300"/>
+    <rect x="192.5" y="64.7" width="20" height="250.3" rx="2" fill="#4a3aa7"/>
+    <text x="202.5" y="60.7" text-anchor="middle" font-size="8" fill="#0b0b0b" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif">0.770</text>
+  </g>
+
+  <!-- Group 1: Rabbani in-domain -->
+  <g>
+    <rect x="220.5" y="92.4" width="20" height="222.6" rx="2" fill="#2a78d6"/>
+    <text x="230.5" y="88.4" text-anchor="middle" font-size="8" fill="#0b0b0b" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif">0.684</text>
+    <rect x="245.5" y="93.7" width="20" height="221.3" rx="2" fill="#eb6834"/>
+    <rect x="270.5" y="116.4" width="20" height="198.6" rx="2" fill="#1baf7a" stroke="rgba(11,11,11,0.15)"/>
+    <rect x="295.5" y="95.6" width="20" height="219.4" rx="2" fill="#eda100" stroke="rgba(11,11,11,0.15)"/>
+    <rect x="320.5" y="108.3" width="20" height="206.7" rx="2" fill="#e87ba4" stroke="rgba(11,11,11,0.15)"/>
+    <rect x="345.5" y="101.8" width="20" height="213.2" rx="2" fill="#008300"/>
+    <rect x="370.5" y="85.5" width="20" height="229.5" rx="2" fill="#4a3aa7"/>
+    <text x="380.5" y="81.5" text-anchor="middle" font-size="8" fill="#0b0b0b" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif">0.706</text>
+  </g>
+
+  <!-- Group 2: HemoSet -> Rabbani (cross); joint n/a, slot skipped -->
+  <g>
+    <rect x="398.5" y="244.5" width="20" height="70.5" rx="2" fill="#2a78d6"/>
+    <text x="408.5" y="240.5" text-anchor="middle" font-size="8" fill="#0b0b0b" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif">0.217</text>
+    <rect x="423.5" y="210.7" width="20" height="104.3" rx="2" fill="#eb6834"/>
+    <rect x="448.5" y="229.5" width="20" height="85.5" rx="2" fill="#1baf7a" stroke="rgba(11,11,11,0.15)"/>
+    <rect x="473.5" y="236.3" width="20" height="78.7" rx="2" fill="#eda100" stroke="rgba(11,11,11,0.15)"/>
+    <rect x="548.5" y="203.5" width="20" height="111.5" rx="2" fill="#4a3aa7"/>
+    <text x="558.5" y="199.5" text-anchor="middle" font-size="8" fill="#0b0b0b" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif">0.343</text>
+  </g>
+
+  <!-- Group 3: Rabbani -> HemoSet (cross); joint n/a, slot skipped -->
+  <g>
+    <rect x="576.5" y="124.9" width="20" height="190.1" rx="2" fill="#2a78d6"/>
+    <text x="586.5" y="120.9" text-anchor="middle" font-size="8" fill="#0b0b0b" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif">0.585</text>
+    <rect x="601.5" y="119.7" width="20" height="195.3" rx="2" fill="#eb6834"/>
+    <rect x="626.5" y="127.4" width="20" height="187.6" rx="2" fill="#1baf7a" stroke="rgba(11,11,11,0.15)"/>
+    <rect x="651.5" y="136.25" width="20" height="178.75" rx="2" fill="#eda100" stroke="rgba(11,11,11,0.15)"/>
+    <rect x="726.5" y="112.5" width="20" height="202.5" rx="2" fill="#4a3aa7"/>
+    <text x="736.5" y="108.5" text-anchor="middle" font-size="8" fill="#0b0b0b" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif">0.623</text>
+  </g>
+
+  <!-- x-axis group labels -->
+  <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="9" fill="#333230" text-anchor="middle">
+    <text x="127.5" y="330">HemoSet</text>
+    <text x="127.5" y="342">in-domain</text>
+    <text x="305.5" y="330">Rabbani</text>
+    <text x="305.5" y="342">in-domain</text>
+    <text x="483.5" y="330">HemoSet→Rabbani</text>
+    <text x="483.5" y="342">(cross)</text>
+    <text x="661.5" y="330">Rabbani→HemoSet</text>
+    <text x="661.5" y="342">(cross)</text>
+  </g>
+</svg>
+<p class="figure-caption">Fig. 1 — Dice medio per strategia (media sulle 3 architetture). Joint training naturale/bilanciato omesso nelle colonne cross-dataset (non applicabile, valutato in-domain su entrambi i domini). Tabella completa dei valori sopra.</p>
+</div>
+
+<h2>5. Discussione</h2>
+<h3>5.1 Perché l'augmentation batte l'adaptation e il joint training</h3>
+<p>Il fattore comune alle due strategie meno efficaci — appearance adaptation sempre-attiva, joint training sbilanciato — sembra essere la mancanza di un meccanismo che preservi l'esposizione del modello alla distribuzione "pulita" del proprio dominio sorgente durante il training. Un intervento <strong>leggero e probabilistico</strong> sulla varietà visiva batte interventi più mirati ma <strong>sempre-attivi</strong> sullo stile o un semplice mescolamento dei dati.</p>
+
+<h3>5.2 Tre estensioni ulteriori (esito negativo, ma informativo)</h3>
+<p>Dopo aver individuato la configurazione consigliata, sono state tentate tre estensioni originali aggiuntive:</p>
+<ol>
+<li><strong>Canale di input "blood-index"</strong> (rapporto R/(R+G+B), meno sensibile in teoria a differenze di camera/illuminazione): migliora leggermente HemoSet→Rabbani (0.321→0.331) ma <strong>peggiora nettamente</strong> Rabbani→HemoSet (0.601→0.526). L'indice, calcolato sui pixel grezzi, si porta dietro le differenze di white-balance tra i dataset invece di ignorarle, diventando una scorciatoia specifica del dominio sorgente.</li>
+<li><strong>MixStyle</strong> (Zhou et al., ICLR 2021): mescola le statistiche delle feature map dell'encoder tra campioni dello stesso batch. Peggioramento diffuso ma contenuto su entrambe le direzioni (0.217→0.203; 0.585→0.561), probabilmente per l'applicazione a livelli troppo bassi dell'encoder e per l'assenza di vera diversità di dominio nei batch (mono-dominio in questo setting).</li>
+<li><strong>Test-time BatchNorm recalibration</strong> (AdaBN, Li et al. 2016): ricalibra le statistiche BatchNorm su immagini del dominio target a inferenza, senza training aggiuntivo. Sposta il compromesso precision/recall in direzioni opposte nelle due direzioni cross-dataset, ma il Dice netto non migliora in nessuna delle due (0.321→0.318; 0.601→0.570).</li>
+</ol>
+<table>
+<thead><tr><th>Estensione</th><th>HemoSet→Rabbani (cross)</th><th>Rabbani→HemoSet (cross)</th><th>Esito</th></tr></thead>
+<tbody>
+<tr><td>Canale blood-index</td><td>0.321→0.331</td><td>0.601→0.526</td><td>Negativo</td></tr>
+<tr><td>MixStyle</td><td>0.217→0.203</td><td>0.585→0.561</td><td>Negativo</td></tr>
+<tr><td>Test-time BN recalibration</td><td>0.321→0.318</td><td>0.601→0.570</td><td>Neutro/negativo</td></tr>
+</tbody>
+</table>
+<p>Nessuna delle tre batte la configurazione consigliata. Il pattern è comunque informativo: tre meccanismi molto diversi falliscono nello stesso modo — introducendo una scorciatoia specifica del dominio sorgente, o disturbando informazione utile senza sostituirla con qualcosa di più trasferibile — rafforzando la conclusione che augmentation aggressiva + ensemble non sia un ottimo locale facilmente migliorabile con interventi leggeri, almeno su questa coppia di dataset.</p>
+
+<h2>6. Limiti e lavori futuri</h2>
+<ul>
+<li>Appearance/domain adaptation applicata con probabilità &lt;1 invece che sempre attiva, per isolare la causa del costo in-domain osservato.</li>
+<li>Combinare augmentation aggressiva e appearance adaptation, per verificare se gli effetti si sommano.</li>
+<li>Self-training con pseudo-label sul dominio target (setting transduttivo, non ancora tentato).</li>
+<li>Un ensemble esteso anche ai fold, oltre che alle sole architetture.</li>
+<li>Analizzare la causa della maggiore difficoltà osservata sistematicamente sul fold 3 di HemoSet.</li>
+<li>Ripetere gli esperimenti più promettenti sui dati reali del progetto TRAMIS quando disponibili, tenendo conto che mescolare dataset esterni di dimensioni molto diverse non è automaticamente benefico senza bilanciamento esplicito.</li>
+<li>Valutare estensioni basate su backbone Transformer pretrained (es. DINOv3, come nel BorDINO di Giusti &amp; Marzo), fuori dallo scope CNN-based di questo lavoro.</li>
+</ul>
+
+<h2>7. Conclusioni</h2>
+<p>Questo lavoro ha quantificato in modo sistematico il domain gap asimmetrico tra HemoSet e Rabbani, e ha confrontato sei famiglie di strategie per aumentare la robustezza cross-dataset dei modelli di segmentazione del sangue in chirurgia. La <strong>data augmentation aggressiva</strong> è risultata la strategia più efficace e a più basso costo; la sua combinazione con un <strong>ensemble di tre architetture</strong> produce il miglior risultato complessivo, senza training aggiuntivo oltre a quello già necessario per l'augmentation. Tre estensioni ulteriori non hanno migliorato questo risultato, ma supportano l'ipotesi che il fattore chiave sia preservare l'esposizione del modello alla distribuzione "pulita" del proprio dominio durante il training, piuttosto che imporre invarianza tramite segnali o normalizzazioni calcolate direttamente sui dati.</p>
+
+<h2>8. Riferimenti bibliografici</h2>
+<div class="biblio">
+<ol>
+<li>A. J. Miao, S. Lin, J. Lu, F. Richter, B. Ostrander, E. K. Funk, R. K. Orosco, M. C. Yip. "HemoSet: The First Blood Segmentation Dataset for Automation of Hemostasis Management." <em>International Symposium on Medical Robotics (ISMR)</em>, 2024.</li>
+<li>N. Rabbani, C. Seve, N. Bourdel, A. Bartoli. "Video-based Computer-aided Laparoscopic Bleeding Management: a Space-time Memory Neural Network with Positional Encoding and Adversarial Domain Adaptation." <em>Medical Imaging with Deep Learning (MIDL)</em>, 2022.</li>
+<li>Y. Yang, S. Soatto. "FDA: Fourier Domain Adaptation for Semantic Segmentation." <em>IEEE/CVF CVPR</em>, 2020.</li>
+<li>E. Reinhard, M. Ashikhmin, B. Gooch, P. Shirley. "Color Transfer between Images." <em>IEEE Computer Graphics and Applications</em>, 2001.</li>
+<li>K. Zhou, Y. Yang, Y. Qiao, T. Xiang. "Domain Generalization with MixStyle." <em>ICLR</em>, 2021.</li>
+<li>Y. Li, N. Wang, J. Shi, J. Liu, X. Hou. "Revisiting Batch Normalization For Practical Domain Adaptation." <em>arXiv:1603.04779</em>, 2016.</li>
+<li>Su et al. <em>AAAI Conference on Artificial Intelligence</em>, 2023.</li>
+<li>F. Giusti, F. Marzo. Report di progetto, Computer Vision and Cognitive Systems, UNIMORE, A.A. 2025/2026.</li>
+</ol>
+</div>
+
+</body>
+</html>
