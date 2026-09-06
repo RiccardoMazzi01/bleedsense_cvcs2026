@@ -11,19 +11,17 @@ Study strategies to increase the **cross-dataset robustness** of surgical blood 
 
 Prior work from the research group observed an asymmetric performance drop when a model trained on one dataset is evaluated on the other: HemoSet→Rabbani shows a general performance drop, while Rabbani→HemoSet shows a strong increase in false positives. This project systematically compares augmentation, appearance/domain adaptation, joint training, ensembling, and a few additional extensions (input channel, feature-level style mixing, test-time normalization) to reduce this gap.
 
-**Full narrative report** (all decisions, experiments, and results, in order): [`docs/cvcs2026_bleedsense_report.md`](docs/cvcs2026_bleedsense_report.md) (Italian, working log). Course deliverables (English): [`docs/cvcs2026_bleedsense_final_report.md`](docs/cvcs2026_bleedsense_final_report.md) / [`docs/cvcs2026_bleedsense_report.html`](docs/cvcs2026_bleedsense_report.html) (main report) and [`docs/cvcs2026_bleedsense_supplementary.html`](docs/cvcs2026_bleedsense_supplementary.html) (full per-architecture tables).
+**Report**: [`docs/cvcs2026_bleedsense_final_report.md`](docs/cvcs2026_bleedsense_final_report.md) / [`docs/cvcs2026_bleedsense_report.html`](docs/cvcs2026_bleedsense_report.html) (main report, with a summary chart) and [`docs/cvcs2026_bleedsense_supplementary.html`](docs/cvcs2026_bleedsense_supplementary.html) (full per-architecture result tables).
 
 ## Repository structure
 
 ```
 bleedsense/
 ├── docs/
-│   ├── cvcs2026_bleedsense_report.md          # full chronological log (source of truth, Italian)
-│   ├── cvcs2026_bleedsense_final_report.md    # concise final report (English, course deliverable)
+│   ├── cvcs2026_bleedsense_final_report.md    # final report (course deliverable)
 │   ├── cvcs2026_bleedsense_report.html        # printable version of the final report, with summary chart
-│   ├── cvcs2026_bleedsense_supplementary.html # full per-architecture result tables (English)
-│   ├── reference_papers/                      # HemoSet, Rabbani, FDA, prior group report (PDF)
-│   └── correspondence/                        # drafts/updates sent to the supervisor (Italian)
+│   ├── cvcs2026_bleedsense_supplementary.html # full per-architecture result tables
+│   └── reference_papers/                      # HemoSet, Rabbani, FDA, prior group report (PDF)
 ├── results/                # raw per-run JSON results + aggregated summary tables (.md)
 ├── dataset.py               # HemoSet + Rabbani loaders, Stratified Group K-Fold, transforms
 ├── models.py                 # architecture factory (segmentation_models_pytorch) + MixStyle
