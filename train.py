@@ -161,6 +161,11 @@ def main():
                          help="Aggiunge un 4o canale di input R/(R+G+B), pensato per essere meno "
                               "sensibile a differenze di camera/illuminazione tra i due dataset. "
                               "Non ancora supportato insieme a --adaptation diversa da 'none'.")
+    parser.add_argument("--mixstyle", action="store_true",
+                         help="Aggancia MixStyle (Zhou et al., ICLR 2021) su layer1/layer2 "
+                              "dell'encoder: mescola le statistiche delle feature map tra campioni "
+                              "dello stesso batch per generalizzare a domini mai visti, senza bisogno "
+                              "di immagini del dominio target (a differenza di Reinhard/FDA).")
     parser.add_argument("--data-dir", default="/work/cvcs2026/bleedsense/datasets")
     parser.add_argument("--output-dir", default="/work/cvcs2026/bleedsense/results")
     parser.add_argument("--epochs", type=int, default=40)
@@ -185,6 +190,7 @@ def main():
     run_name += f"_adapt{args.adaptation}" if args.adaptation != "none" else ""
     run_name += "_balanced" if args.dataset == "joint" and args.joint_sampling == "balanced" else ""
     run_name += "_bloodindex" if args.use_blood_index else ""
+    run_name += "_mixstyle" if args.mixstyle else ""
 
     os.makedirs(args.output_dir, exist_ok=True)
     ckpt_dir = os.path.join(args.output_dir, "checkpoints")
@@ -245,7 +251,9 @@ def main():
 
     # --- Modello ---
     in_channels = 4 if args.use_blood_index else 3
-    model = get_model(args.architecture, encoder_name=args.encoder, in_channels=in_channels).to(device)
+    mixstyle_layers = ("layer1", "layer2") if args.mixstyle else None
+    model = get_model(args.architecture, encoder_name=args.encoder, in_channels=in_channels,
+                       mixstyle_layers=mixstyle_layers).to(device)
     criterion = DiceBCELoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3)
@@ -294,6 +302,7 @@ def main():
         "adaptation": args.adaptation,
         "joint_sampling": args.joint_sampling if args.dataset == "joint" else None,
         "use_blood_index": args.use_blood_index,
+        "mixstyle": args.mixstyle,
         "fold": args.fold if args.dataset in ("hemoset", "joint") else None,
         "seed": args.seed,
         "epochs_trained": len(history),

@@ -7,13 +7,15 @@ ARCHITECTURES = ["unet", "unetplusplus", "deeplabv3plus"]
 AUGMENTATIONS = ["light", "aggressive"]
 ADAPTATIONS = ["none", "reinhard", "fda"]
 BLOOD_INDEX_OPTIONS = [False, True]
+MIXSTYLE_OPTIONS = [False, True]
 METRICS = ["dice", "iou", "precision", "recall", "f1", "hd95"]
 
 
-def suffix(augmentation, adaptation, use_blood_index=False):
+def suffix(augmentation, adaptation, use_blood_index=False, mixstyle=False):
     s = "" if augmentation == "light" else f"_aug{augmentation}"
     s += "" if adaptation == "none" else f"_adapt{adaptation}"
     s += "_bloodindex" if use_blood_index else ""
+    s += "_mixstyle" if mixstyle else ""
     return s
 
 
@@ -40,8 +42,9 @@ def fmt(values):
     return f"{m:.3f}"
 
 
-def summarize_hemoset(arch, augmentation, adaptation, use_blood_index=False):
-    runs = [load(f"hemoset_{arch}_fold{i}{suffix(augmentation, adaptation, use_blood_index)}") for i in range(5)]
+def summarize_hemoset(arch, augmentation, adaptation, use_blood_index=False, mixstyle=False):
+    runs = [load(f"hemoset_{arch}_fold{i}{suffix(augmentation, adaptation, use_blood_index, mixstyle)}")
+            for i in range(5)]
     runs = [r for r in runs if r is not None]
     if not runs:
         return None, None
@@ -50,8 +53,8 @@ def summarize_hemoset(arch, augmentation, adaptation, use_blood_index=False):
     return indomain, cross
 
 
-def summarize_rabbani(arch, augmentation, adaptation, use_blood_index=False):
-    run = load(f"rabbani_{arch}{suffix(augmentation, adaptation, use_blood_index)}")
+def summarize_rabbani(arch, augmentation, adaptation, use_blood_index=False, mixstyle=False):
+    run = load(f"rabbani_{arch}{suffix(augmentation, adaptation, use_blood_index, mixstyle)}")
     if run is None:
         return None, None
     indomain = {m: [run["indomain_test"][m]] for m in METRICS}
@@ -71,26 +74,32 @@ def main():
                     if use_bi and not (aug == "aggressive" and adapt == "none"):
                         continue  # blood-index testato solo sopra la condizione migliore finora
 
-                    h_in, h_cross = summarize_hemoset(arch, aug, adapt, use_bi)
-                    r_in, r_cross = summarize_rabbani(arch, aug, adapt, use_bi)
-                    if h_in is not None:
-                        rows.append(("HemoSet -> HemoSet (in-domain)", arch, aug, adapt, use_bi, h_in))
-                        rows.append(("HemoSet -> Rabbani (cross)", arch, aug, adapt, use_bi, h_cross))
-                    if r_in is not None:
-                        rows.append(("Rabbani -> Rabbani (in-domain)", arch, aug, adapt, use_bi, r_in))
-                        rows.append(("Rabbani -> HemoSet (cross)", arch, aug, adapt, use_bi, r_cross))
+                    for use_ms in MIXSTYLE_OPTIONS:
+                        if use_ms and not (aug == "light" and adapt == "none" and not use_bi):
+                            continue  # mixstyle testato solo su light/none, isolato dagli altri assi
+                        if use_bi and use_ms:
+                            continue  # combinazione non eseguita
+
+                        h_in, h_cross = summarize_hemoset(arch, aug, adapt, use_bi, use_ms)
+                        r_in, r_cross = summarize_rabbani(arch, aug, adapt, use_bi, use_ms)
+                        if h_in is not None:
+                            rows.append(("HemoSet -> HemoSet (in-domain)", arch, aug, adapt, use_bi, use_ms, h_in))
+                            rows.append(("HemoSet -> Rabbani (cross)", arch, aug, adapt, use_bi, use_ms, h_cross))
+                        if r_in is not None:
+                            rows.append(("Rabbani -> Rabbani (in-domain)", arch, aug, adapt, use_bi, use_ms, r_in))
+                            rows.append(("Rabbani -> HemoSet (cross)", arch, aug, adapt, use_bi, use_ms, r_cross))
 
     if not rows:
         print("Nessun risultato trovato in", RESULTS_DIR)
         return
 
-    header = ("| Setting | Architettura | Augmentation | Adaptation | BloodIndex | "
+    header = ("| Setting | Architettura | Augmentation | Adaptation | BloodIndex | MixStyle | "
               + " | ".join(m.upper() for m in METRICS) + " |")
-    sep = "|---" * (5 + len(METRICS)) + "|"
+    sep = "|---" * (6 + len(METRICS)) + "|"
     lines = [header, sep]
-    for setting, arch, aug, adapt, use_bi, metrics in rows:
+    for setting, arch, aug, adapt, use_bi, use_ms, metrics in rows:
         cells = " | ".join(fmt(metrics[m]) for m in METRICS)
-        lines.append(f"| {setting} | {arch} | {aug} | {adapt} | {use_bi} | {cells} |")
+        lines.append(f"| {setting} | {arch} | {aug} | {adapt} | {use_bi} | {use_ms} | {cells} |")
 
     table_md = "\n".join(lines)
     print(table_md)
