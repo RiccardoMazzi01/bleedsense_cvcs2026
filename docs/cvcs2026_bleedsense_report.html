@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<title>BleedSense — Report finale CVCS</title>
+<title>BleedSense — Final Report CVCS</title>
 <style>
   @page { size: A4; margin: 20mm 18mm; }
   * { box-sizing: border-box; }
@@ -79,80 +79,80 @@
 </head>
 <body>
 
-<h1>BleedSense — Robustezza cross-dataset per la segmentazione del sangue in chirurgia robotica</h1>
-<p class="subtitle">Report finale — Corso di Computer Vision and Cognitive Systems (CVCS), A.A. 2025/2026, UNIMORE</p>
-<p class="authors">Riccardo Mazzi (294437) — Supervisione: Dott.ssa Livia Del Gaudio (AImageLab, progetto TRAMIS)</p>
+<h1>BleedSense — Cross-Dataset Robustness for Surgical Blood Segmentation</h1>
+<p class="subtitle">Final report — Computer Vision and Cognitive Systems (CVCS) course, A.Y. 2025/2026, UNIMORE</p>
+<p class="authors">Riccardo Mazzi (294437) — Supervisor: Dr. Livia Del Gaudio (AImageLab, TRAMIS project)</p>
 
 <div class="abstract">
-<p><strong>Abstract.</strong> La gestione automatica dell'emostasi in chirurgia robotica richiede la segmentazione affidabile del sangue nel campo operatorio. I modelli allenati su un singolo dataset chirurgico generalizzano tuttavia male su altri dataset con caratteristiche visive diverse. Questo lavoro studia il problema su due dataset pubblici, <strong>HemoSet</strong> (chirurgia robotica su modello suino) e <strong>Rabbani et al.</strong> (laparoscopia ginecologica su umani), confermando un <strong>domain gap asimmetrico</strong> già osservato in lavori precedenti del gruppo di ricerca, e confronta sistematicamente sei famiglie di strategie per ridurlo: data augmentation aggressiva, appearance/domain adaptation (Reinhard, FDA), joint training multi-dominio (con e senza bilanciamento), ensembling di più architetture, un canale di input invariante all'illuminazione e style-mixing a livello di feature (MixStyle), oltre a una ricalibrazione delle statistiche BatchNorm a inferenza. Su tre architetture standard (UNet, UNet++, DeepLabV3+, encoder <code>resnet34</code>), la strategia più efficace è la <strong>data augmentation aggressiva</strong>, che migliora la robustezza cross-dataset in entrambe le direzioni senza costi apprezzabili in-domain; combinata con un <strong>ensemble delle tre architetture</strong>, produce il miglior risultato complessivo. Le tre estensioni più originali tentate in un secondo momento non hanno migliorato ulteriormente questo risultato, ma la loro analisi fornisce indicazioni utili sul motivo per cui interventi più mirati falliscono in questo setting.</p>
+<p><strong>Abstract.</strong> Automatic hemostasis management in robotic surgery requires reliable segmentation of blood in the operative field. Models trained on a single surgical dataset, however, generalize poorly to other datasets with different visual characteristics. This work studies the problem on two public datasets, <strong>HemoSet</strong> (robotic surgery on a porcine model) and <strong>Rabbani et al.</strong> (gynecological laparoscopy on humans), confirming an <strong>asymmetric domain gap</strong> already observed in previous work from the research group, and systematically compares six families of strategies to reduce it: aggressive data augmentation, appearance/domain adaptation (Reinhard, FDA), multi-domain joint training (with and without balancing), ensembling of multiple architectures, an illumination-invariant input channel and feature-level style mixing (MixStyle), plus a test-time BatchNorm recalibration. Across three standard architectures (UNet, UNet++, DeepLabV3+, <code>resnet34</code> encoder), the most effective strategy is <strong>aggressive data augmentation</strong>, which improves cross-dataset robustness in both directions with no appreciable in-domain cost; combined with an <strong>ensemble of the three architectures</strong>, it yields the best overall result. Three further, more original extensions attempted afterwards did not improve on this result any further, but their analysis provides useful insight into why more targeted interventions fail in this setting.</p>
 </div>
 
-<h2>1. Introduzione e motivazione</h2>
-<p>L'automazione della gestione dell'emostasi in chirurgia robotica — l'identificazione e il controllo del sanguinamento durante l'intervento — richiede come primo passo la segmentazione affidabile del sangue nel campo visivo endoscopico. Questo progetto si inserisce nell'iniziativa di ricerca <strong>TRAMIS</strong>, orientata alla rilevazione in tempo reale del sanguinamento in chirurgia robotica; poiché al momento di questo lavoro non erano ancora disponibili dati chirurgici reali annotati del progetto, lo studio è stato condotto su due dataset pubblici di riferimento nel dominio, usati come proxy: <strong>HemoSet</strong> (Miao et al., ISMR 2024 — sanguinamenti indotti su modello suino, 962 coppie immagine-maschera, 10 soggetti) e <strong>Rabbani et al.</strong> (MIDL 2022 — laparoscopia ginecologica su umani, 751 immagini annotate).</p>
-<p>Un lavoro precedente del gruppo di ricerca (Giusti &amp; Marzo, report CVCS 2025/2026, Sezione 2) aveva osservato un calo di performance <strong>asimmetrico</strong> quando un modello allenato su uno dei due dataset viene valutato sull'altro: <strong>HemoSet → Rabbani</strong> mostra un forte calo generale delle performance, mentre <strong>Rabbani → HemoSet</strong> mostra un aumento marcato dei falsi positivi (regioni non ematiche segmentate come sangue).</p>
-<p><strong>Obiettivo del progetto</strong>: quantificare questa asimmetria in modo rigoroso e riproducibile, e studiare sistematicamente quali strategie aumentano effettivamente la robustezza cross-dataset dei modelli di segmentazione, confrontando più condizioni sperimentali senza vincolo di convergere su un'unica soluzione.</p>
+<h2>1. Introduction and Motivation</h2>
+<p>Automating hemostasis management in robotic surgery — identifying and controlling bleeding during the procedure — requires, as a first step, reliable segmentation of blood in the endoscopic field of view. This project is part of the <strong>TRAMIS</strong> research initiative, focused on real-time bleeding detection in robotic surgery; since real, annotated TRAMIS surgical data were not yet available at the time of this work, the study was conducted on two public reference datasets in the domain, used as proxies: <strong>HemoSet</strong> (Miao et al., ISMR 2024 — induced bleeding on a porcine model, 962 image-mask pairs, 10 subjects) and <strong>Rabbani et al.</strong> (MIDL 2022 — gynecological laparoscopy on humans, 751 annotated images).</p>
+<p>Previous work from the research group (Giusti &amp; Marzo, CVCS 2025/2026 project report, Section 2) had observed an <strong>asymmetric</strong> performance drop when a model trained on one of the two datasets is evaluated on the other: <strong>HemoSet → Rabbani</strong> shows a strong general performance drop, while <strong>Rabbani → HemoSet</strong> shows a marked increase in false positives (non-hemorrhagic regions segmented as blood).</p>
+<p><strong>Project goal</strong>: to quantify this asymmetry rigorously and reproducibly, and to systematically study which strategies actually increase the cross-dataset robustness of segmentation models, comparing multiple experimental conditions without the constraint of converging on a single solution.</p>
 
-<h2>2. Lavori correlati</h2>
+<h2>2. Related Work</h2>
 <ul>
-<li><strong>Miao et al.</strong>, "HemoSet: The First Blood Segmentation Dataset for Automation of Hemostasis Management", ISMR 2024 — dataset HemoSet; benchmark di modelli standard, metriche IoU/F1/Hausdorff Distance.</li>
-<li><strong>Rabbani et al.</strong>, "Video-based Computer-aided Laparoscopic Bleeding Management...", MIDL 2022 — dataset e sistema di segmentazione con adversarial domain adaptation; metriche IoU e F-Score.</li>
-<li><strong>Yang &amp; Soatto</strong>, "FDA: Fourier Domain Adaptation for Semantic Segmentation", CVPR 2020 — scambio delle componenti a bassa frequenza nello spettro di Fourier, usato come appearance adaptation (Sez. 4.2).</li>
-<li><strong>Reinhard et al.</strong>, "Color Transfer between Images", IEEE CG&amp;A 2001 — color transfer statistico in L*a*b*, secondo metodo di appearance adaptation.</li>
-<li><strong>Zhou et al.</strong>, "Domain Generalization with MixStyle", ICLR 2021 — style mixing a livello di feature, usato come estensione (Sez. 5.2).</li>
-<li><strong>Li et al.</strong>, "Revisiting Batch Normalization For Practical Domain Adaptation" (AdaBN), 2016 — ricalibrazione BatchNorm a inferenza, usata come estensione (Sez. 5.2).</li>
-<li><strong>Su et al.</strong>, AAAI 2023 — domain generalization single-source tramite augmentation.</li>
-<li><strong>Giusti &amp; Marzo</strong>, report CVCS 2025/2026 — prima quantificazione del domain gap asimmetrico (Dice zero-shot: HemoSet→Rabbani 0.29, Rabbani→HemoSet 0.56), coerente con Sez. 4.1 nonostante split/iperparametri diversi.</li>
+<li><strong>Miao et al.</strong>, "HemoSet: The First Blood Segmentation Dataset for Automation of Hemostasis Management", ISMR 2024 — the HemoSet dataset; benchmark of standard segmentation models, IoU/F1/Hausdorff Distance metrics.</li>
+<li><strong>Rabbani et al.</strong>, "Video-based Computer-aided Laparoscopic Bleeding Management...", MIDL 2022 — dataset and segmentation system with adversarial domain adaptation; IoU and F-Score metrics.</li>
+<li><strong>Yang &amp; Soatto</strong>, "FDA: Fourier Domain Adaptation for Semantic Segmentation", CVPR 2020 — swapping low-frequency amplitude components in the Fourier spectrum, used as appearance adaptation (Sec. 4.2).</li>
+<li><strong>Reinhard et al.</strong>, "Color Transfer between Images", IEEE CG&amp;A 2001 — statistical color transfer in L*a*b*, second appearance adaptation method.</li>
+<li><strong>Zhou et al.</strong>, "Domain Generalization with MixStyle", ICLR 2021 — feature-level style mixing, used as an extension (Sec. 5.2).</li>
+<li><strong>Li et al.</strong>, "Revisiting Batch Normalization For Practical Domain Adaptation" (AdaBN), 2016 — test-time BatchNorm recalibration, used as an extension (Sec. 5.2).</li>
+<li><strong>Su et al.</strong>, AAAI 2023 — single-source domain generalization via augmentation.</li>
+<li><strong>Giusti &amp; Marzo</strong>, CVCS 2025/2026 project report — first quantification of the asymmetric domain gap (zero-shot Dice: HemoSet→Rabbani 0.29, Rabbani→HemoSet 0.56), consistent with Sec. 4.1 despite different splits/hyperparameters.</li>
 </ul>
 
-<h2>3. Approccio</h2>
-<h3>3.1 Dataset e split</h3>
-<p><strong>HemoSet</strong>: 962 coppie immagine-maschera, 10 soggetti (pig). Split <strong>Stratified Group K-Fold</strong> a 5 fold, con il soggetto come gruppo. <strong>Rabbani</strong>: 751 immagini/maschere, split fisso <strong>70/15/15</strong> (seed 42), riusato identico in tutte le fasi.</p>
-<h3>3.2 Architetture e protocollo di training</h3>
-<p>Tre architetture standard via <code>segmentation_models_pytorch</code>, stesso encoder <code>resnet34</code>: <strong>UNet</strong>, <strong>UNet++</strong>, <strong>DeepLabV3+</strong>. Loss Dice+BCE, AdamW (lr 1e-4), <code>ReduceLROnPlateau</code>, batch size 8, immagini 256×256, dataset completo per split. Early stopping su Dice di validazione (patience 8, cap 40 epoche) — verificato empiricamente su tutti gli 87 run di Fasi 1-4 che il budget fosse sufficiente (solo 2/87 hanno raggiunto il cap, con residuo &lt;0.01 Dice). Stessa configurazione identica per ogni condizione confrontata, per isolare la sola variabile in esame.</p>
-<h3>3.3 Metriche e protocollo di valutazione</h3>
-<p>Dice, IoU, Precision, Recall, F1, <strong>HD95</strong> — l'insieme copre per intero le metriche dei paper originali di entrambi i dataset. Un modello allenato su HemoSet è valutato in-domain sul fold di validazione e cross-dataset sul test set fisso di Rabbani; un modello allenato su Rabbani è valutato in-domain sul proprio test set e cross-dataset su tutto HemoSet (mai visto in training).</p>
+<h2>3. Approach</h2>
+<h3>3.1 Datasets and Splits</h3>
+<p><strong>HemoSet</strong>: 962 image-mask pairs, 10 subjects (pigs). <strong>Stratified Group K-Fold</strong> split into 5 folds, with the subject as the group. <strong>Rabbani</strong>: 751 images/masks, fixed <strong>70/15/15</strong> split (seed 42), reused identically across all phases.</p>
+<h3>3.2 Architectures and Training Protocol</h3>
+<p>Three standard architectures via <code>segmentation_models_pytorch</code>, same <code>resnet34</code> encoder: <strong>UNet</strong>, <strong>UNet++</strong>, <strong>DeepLabV3+</strong>. Dice+BCE loss, AdamW (lr 1e-4), <code>ReduceLROnPlateau</code>, batch size 8, 256×256 images, the full dataset for each split. Early stopping on validation Dice (patience 8, cap of 40 epochs) — empirically verified across all 87 Phase 1-4 runs that this budget was sufficient (only 2/87 runs reached the cap, with a residual &lt;0.01 Dice). The exact same configuration was used for every condition compared, to isolate the single variable under study.</p>
+<h3>3.3 Metrics and Evaluation Protocol</h3>
+<p>Dice, IoU, Precision, Recall, F1, <strong>HD95</strong> — this set fully covers the metrics of the original papers of both datasets. A model trained on HemoSet is evaluated in-domain on the validation fold and cross-dataset on the fixed Rabbani test set; a model trained on Rabbani is evaluated in-domain on its own test set and cross-dataset on the whole of HemoSet (never seen during training).</p>
 
-<h2>4. Risultati</h2>
-<h3>4.1 Baseline e asimmetria del domain gap</h3>
-<p>Le tre architetture allenate separatamente sui due dataset (augmentation minima) confermano e quantificano l'asimmetria: <strong>HemoSet→Rabbani</strong> il Dice medio crolla di circa il 70% relativo (0.745 → 0.217), con HD95 che passa da ~29px a ~130px, per un crollo del <strong>recall</strong> (0.76→0.19): il modello diventa troppo conservativo sul dominio target. <strong>Rabbani→HemoSet</strong> il calo è più contenuto (0.684 → 0.585) ma la <strong>precision</strong> crolla (0.74→0.50) mentre il recall resta alto — coerente con l'osservazione originale sui falsi positivi. Le tre architetture si comportano in modo molto simile in ogni condizione: nessuna risolve da sola il domain gap.</p>
+<h2>4. Results</h2>
+<h3>4.1 Baseline and Domain Gap Asymmetry</h3>
+<p>The three architectures, trained separately on the two datasets (minimal augmentation), confirm and quantify the asymmetry: for <strong>HemoSet→Rabbani</strong>, mean Dice drops by about 70% relative (0.745 → 0.217), with HD95 rising from ~29px to ~130px, driven by a collapse in <strong>recall</strong> (0.76→0.19): the model becomes too conservative on the target domain. For <strong>Rabbani→HemoSet</strong>, the drop is more contained (0.684 → 0.585) but <strong>precision</strong> collapses (0.74→0.50) while recall stays high — consistent with the original observation about false positives. The three architectures behave very similarly under every condition: none resolves the domain gap on its own.</p>
 
-<h3>4.2 Data augmentation, appearance adaptation, joint training</h3>
-<p>Un'augmentation "aggressiva" (hue/saturation, gamma, blur, rumore, compressione JPEG) <strong>migliora la robustezza cross-dataset su tutte e tre le architetture in entrambe le direzioni</strong>, quasi senza costo in-domain (HemoSet→Rabbani: 0.217→0.321, +48% relativo; Rabbani→HemoSet: 0.585→0.601). Reinhard color transfer e Fourier Domain Adaptation, applicati con immagini non annotate del dominio target, aiutano la direzione più critica (HemoSet→Rabbani: →0.263 e →0.242 rispettivamente) ma <strong>a un costo in-domain non trascurabile</strong> (Rabbani in-domain: 0.684→0.611 con Reinhard) e non battono l'augmentation aggressiva — probabilmente perché, a differenza dell'augmentation (probabilistica), l'adaptation qui è sempre attiva: il modello non vede mai l'aspetto "pulito" del proprio dominio sorgente durante il training.</p>
-<p>Il <strong>joint training</strong> (unione di HemoSet e Rabbani, test set held-out separati) non è una soluzione: nessun beneficio sistematico su HemoSet, calo sistematico su Rabbani (0.684→0.636) dovuto allo sbilanciamento tra le dimensioni dei due dataset (~59%/41%). Un campionamento bilanciato (<code>WeightedRandomSampler</code>) recupera solo metà del calo (→0.656), senza rendere la strategia competitiva.</p>
+<h3>4.2 Data Augmentation, Appearance Adaptation, Joint Training</h3>
+<p>An "aggressive" augmentation (hue/saturation, gamma, blur, noise, JPEG compression) <strong>improves cross-dataset robustness across all three architectures in both directions</strong>, at almost no in-domain cost (HemoSet→Rabbani: 0.217→0.321, +48% relative; Rabbani→HemoSet: 0.585→0.601). Reinhard color transfer and Fourier Domain Adaptation, applied with unlabeled target-domain images, help the more critical direction (HemoSet→Rabbani: →0.263 and →0.242 respectively) but <strong>at a non-negligible in-domain cost</strong> (Rabbani in-domain: 0.684→0.611 with Reinhard) and do not beat aggressive augmentation — likely because, unlike augmentation (probabilistic), adaptation here is always active: the model never sees the "clean" appearance of its own source domain during training.</p>
+<p><strong>Joint training</strong> (union of HemoSet and Rabbani, separate held-out test sets) is not a solution: no systematic benefit on HemoSet, systematic drop on Rabbani (0.684→0.636) caused by the size imbalance between the two datasets (~59%/41%). A balanced sampling scheme (<code>WeightedRandomSampler</code>) recovers only about half of the drop (→0.656), without making the strategy competitive.</p>
 
-<h3>4.3 Ensemble delle tre architetture</h3>
-<p>Come contributo originale, si è ensemblato — a costo computazionale nullo (media delle probabilità sigmoid dei checkpoint già allenati con augmentation aggressiva) — le predizioni delle tre architetture. Il risultato batte il migliore dei tre modelli singoli su <strong>tutte e quattro</strong> le condizioni testate (es. HemoSet→Rabbani: 0.337 il migliore singolo → 0.343; Rabbani→HemoSet: 0.615 → 0.623).</p>
+<h3>4.3 Ensemble of the Three Architectures</h3>
+<p>As an original contribution, the three architectures' predictions were ensembled — at zero additional training cost (averaging the sigmoid probabilities of the already-trained aggressive-augmentation checkpoints). The result beats the best single model on <strong>all four</strong> tested conditions (e.g., HemoSet→Rabbani: 0.337 best single model → 0.343; Rabbani→HemoSet: 0.615 → 0.623).</p>
 
-<h3>4.4 Sintesi comparativa</h3>
-<p>Media sulle tre architetture per ciascuna strategia (dettaglio completo per architettura nei materiali supplementari):</p>
+<h3>4.4 Comparative Summary</h3>
+<p>Mean over the three architectures for each strategy (full per-architecture breakdown in the supplementary materials):</p>
 
 <table>
-<thead><tr><th>Strategia</th><th>HemoSet (in-domain)</th><th>Rabbani (in-domain)</th><th>HemoSet→Rabbani (cross)</th><th>Rabbani→HemoSet (cross)</th></tr></thead>
+<thead><tr><th>Strategy</th><th>HemoSet (in-domain)</th><th>Rabbani (in-domain)</th><th>HemoSet→Rabbani (cross)</th><th>Rabbani→HemoSet (cross)</th></tr></thead>
 <tbody>
 <tr><td>Baseline (source-only)</td><td>0.745</td><td>0.684</td><td>0.217</td><td>0.585</td></tr>
-<tr><td>Augmentation aggressiva</td><td>0.747</td><td>0.681</td><td>0.321</td><td>0.601</td></tr>
+<tr><td>Aggressive augmentation</td><td>0.747</td><td>0.681</td><td>0.321</td><td>0.601</td></tr>
 <tr><td>Appearance adaptation (Reinhard)</td><td>0.719</td><td>0.611</td><td>0.263</td><td>0.577</td></tr>
 <tr><td>Appearance adaptation (FDA)</td><td>0.720</td><td>0.675</td><td>0.242</td><td>0.550</td></tr>
-<tr><td>Joint training naturale</td><td>0.742</td><td>0.636</td><td>n/a*</td><td>n/a*</td></tr>
-<tr><td>Joint training bilanciato</td><td>0.739</td><td>0.656</td><td>n/a*</td><td>n/a*</td></tr>
-<tr><td>Ensemble 3 architetture (su aggressiva)</td><td>0.770</td><td>0.706</td><td>0.343</td><td>0.623</td></tr>
+<tr><td>Natural joint training</td><td>0.742</td><td>0.636</td><td>n/a*</td><td>n/a*</td></tr>
+<tr><td>Balanced joint training</td><td>0.739</td><td>0.656</td><td>n/a*</td><td>n/a*</td></tr>
+<tr><td>Ensemble of 3 architectures (on aggressive)</td><td>0.770</td><td>0.706</td><td>0.343</td><td>0.623</td></tr>
 </tbody>
 </table>
-<p class="footnote">* il joint training è valutato in-domain su entrambi i test set, non esiste una condizione "cross-dataset" comparabile per questa riga.</p>
+<p class="footnote">* joint training is evaluated in-domain on both test sets, so there is no comparable "cross-dataset" condition for this row.</p>
 
 <div class="figure">
-<svg viewBox="0 0 760 365" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Grafico a barre: Dice medio per strategia e condizione di valutazione">
-  <text x="380" y="14" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="11" font-weight="600" fill="#0b0b0b">Dice medio per strategia e condizione di valutazione (media sulle 3 architetture)</text>
+<svg viewBox="0 0 760 365" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bar chart: mean Dice by strategy and evaluation condition">
+  <text x="380" y="14" text-anchor="middle" font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="11" font-weight="600" fill="#0b0b0b">Mean Dice by strategy and evaluation condition (averaged over 3 architectures)</text>
 
-  <!-- legenda riga 1 -->
+  <!-- legend row -->
   <g font-family="-apple-system,Segoe UI,Roboto,Arial,sans-serif" font-size="8.5" fill="#333230">
     <rect x="40" y="22" width="10" height="10" rx="2" fill="#2a78d6"/><text x="53" y="30.5">Baseline</text>
-    <rect x="150" y="22" width="10" height="10" rx="2" fill="#eb6834"/><text x="163" y="30.5">Aug. aggressiva</text>
+    <rect x="150" y="22" width="10" height="10" rx="2" fill="#eb6834"/><text x="163" y="30.5">Aggressive aug.</text>
     <rect x="290" y="22" width="10" height="10" rx="2" fill="#1baf7a" stroke="rgba(11,11,11,0.15)"/><text x="303" y="30.5">Reinhard</text>
-    <rect x="400" y="22" width="10" height="10" rx="2" fill="#eda100" stroke="rgba(11,11,11,0.15)"/><text x="413" y="30.5">FDA</text>
-    <rect x="470" y="22" width="10" height="10" rx="2" fill="#e87ba4" stroke="rgba(11,11,11,0.15)"/><text x="483" y="30.5">Joint naturale</text>
-    <rect x="610" y="22" width="10" height="10" rx="2" fill="#008300"/><text x="623" y="30.5">Joint bilanciato</text>
-    <rect x="40" y="38" width="10" height="10" rx="2" fill="#4a3aa7"/><text x="53" y="46.5">Ensemble (3 architetture)</text>
+    <rect x="390" y="22" width="10" height="10" rx="2" fill="#eda100" stroke="rgba(11,11,11,0.15)"/><text x="403" y="30.5">FDA</text>
+    <rect x="450" y="22" width="10" height="10" rx="2" fill="#e87ba4" stroke="rgba(11,11,11,0.15)"/><text x="463" y="30.5">Natural joint training</text>
+    <rect x="620" y="22" width="10" height="10" rx="2" fill="#008300"/><text x="633" y="30.5">Balanced joint training</text>
+    <rect x="40" y="38" width="10" height="10" rx="2" fill="#4a3aa7"/><text x="53" y="46.5">Ensemble (3 architectures)</text>
   </g>
 
   <!-- gridlines + y labels -->
@@ -231,45 +231,45 @@
     <text x="661.5" y="342">(cross)</text>
   </g>
 </svg>
-<p class="figure-caption">Fig. 1 — Dice medio per strategia (media sulle 3 architetture). Joint training naturale/bilanciato omesso nelle colonne cross-dataset (non applicabile, valutato in-domain su entrambi i domini). Tabella completa dei valori sopra.</p>
+<p class="figure-caption">Fig. 1 — Mean Dice by strategy (averaged over 3 architectures). Natural/balanced joint training omitted in the cross-dataset columns (not applicable, evaluated in-domain on both domains). Full values in the table above.</p>
 </div>
 
-<h2>5. Discussione</h2>
-<h3>5.1 Perché l'augmentation batte l'adaptation e il joint training</h3>
-<p>Il fattore comune alle due strategie meno efficaci — appearance adaptation sempre-attiva, joint training sbilanciato — sembra essere la mancanza di un meccanismo che preservi l'esposizione del modello alla distribuzione "pulita" del proprio dominio sorgente durante il training. Un intervento <strong>leggero e probabilistico</strong> sulla varietà visiva batte interventi più mirati ma <strong>sempre-attivi</strong> sullo stile o un semplice mescolamento dei dati.</p>
+<h2>5. Discussion</h2>
+<h3>5.1 Why Augmentation Beats Adaptation and Joint Training</h3>
+<p>The common factor behind the two less effective strategies — always-active appearance adaptation, imbalanced joint training — appears to be the lack of a mechanism that still preserves the model's exposure to the "clean" distribution of its own source domain during training. A <strong>light, probabilistic</strong> intervention on visual variety beats more targeted but <strong>always-active</strong> interventions on style, or simply mixing the data together.</p>
 
-<h3>5.2 Tre estensioni ulteriori (esito negativo, ma informativo)</h3>
-<p>Dopo aver individuato la configurazione consigliata, sono state tentate tre estensioni originali aggiuntive:</p>
+<h3>5.2 Three Further Extensions (Negative but Informative Outcome)</h3>
+<p>After identifying the recommended configuration, three additional original extensions were attempted:</p>
 <ol>
-<li><strong>Canale di input "blood-index"</strong> (rapporto R/(R+G+B), meno sensibile in teoria a differenze di camera/illuminazione): migliora leggermente HemoSet→Rabbani (0.321→0.331) ma <strong>peggiora nettamente</strong> Rabbani→HemoSet (0.601→0.526). L'indice, calcolato sui pixel grezzi, si porta dietro le differenze di white-balance tra i dataset invece di ignorarle, diventando una scorciatoia specifica del dominio sorgente.</li>
-<li><strong>MixStyle</strong> (Zhou et al., ICLR 2021): mescola le statistiche delle feature map dell'encoder tra campioni dello stesso batch. Peggioramento diffuso ma contenuto su entrambe le direzioni (0.217→0.203; 0.585→0.561), probabilmente per l'applicazione a livelli troppo bassi dell'encoder e per l'assenza di vera diversità di dominio nei batch (mono-dominio in questo setting).</li>
-<li><strong>Test-time BatchNorm recalibration</strong> (AdaBN, Li et al. 2016): ricalibra le statistiche BatchNorm su immagini del dominio target a inferenza, senza training aggiuntivo. Sposta il compromesso precision/recall in direzioni opposte nelle due direzioni cross-dataset, ma il Dice netto non migliora in nessuna delle due (0.321→0.318; 0.601→0.570).</li>
+<li><strong>"Blood-index" input channel</strong> (ratio R/(R+G+B), in theory less sensitive to camera/illumination differences): slightly improves HemoSet→Rabbani (0.321→0.331) but <strong>markedly worsens</strong> Rabbani→HemoSet (0.601→0.526). The index, computed on raw pixels, carries over the white-balance differences between the datasets instead of ignoring them, becoming a shortcut feature specific to the source domain.</li>
+<li><strong>MixStyle</strong> (Zhou et al., ICLR 2021): mixes the encoder's feature-map statistics between samples in the same batch. A diffuse but small degradation in both directions (0.217→0.203; 0.585→0.561), likely due to being applied too early in the encoder and to the lack of true domain diversity in the batches (single-domain in this setting).</li>
+<li><strong>Test-time BatchNorm recalibration</strong> (AdaBN, Li et al. 2016): recalibrates BatchNorm statistics on target-domain images at inference time, with no additional training. Shifts the precision/recall trade-off in opposite directions in the two cross-dataset directions, but net Dice does not improve in either direction (0.321→0.318; 0.601→0.570).</li>
 </ol>
 <table>
-<thead><tr><th>Estensione</th><th>HemoSet→Rabbani (cross)</th><th>Rabbani→HemoSet (cross)</th><th>Esito</th></tr></thead>
+<thead><tr><th>Extension</th><th>HemoSet→Rabbani (cross)</th><th>Rabbani→HemoSet (cross)</th><th>Outcome</th></tr></thead>
 <tbody>
-<tr><td>Canale blood-index</td><td>0.321→0.331</td><td>0.601→0.526</td><td>Negativo</td></tr>
-<tr><td>MixStyle</td><td>0.217→0.203</td><td>0.585→0.561</td><td>Negativo</td></tr>
-<tr><td>Test-time BN recalibration</td><td>0.321→0.318</td><td>0.601→0.570</td><td>Neutro/negativo</td></tr>
+<tr><td>Blood-index channel</td><td>0.321→0.331</td><td>0.601→0.526</td><td>Negative</td></tr>
+<tr><td>MixStyle</td><td>0.217→0.203</td><td>0.585→0.561</td><td>Negative</td></tr>
+<tr><td>Test-time BN recalibration</td><td>0.321→0.318</td><td>0.601→0.570</td><td>Neutral/negative</td></tr>
 </tbody>
 </table>
-<p>Nessuna delle tre batte la configurazione consigliata. Il pattern è comunque informativo: tre meccanismi molto diversi falliscono nello stesso modo — introducendo una scorciatoia specifica del dominio sorgente, o disturbando informazione utile senza sostituirla con qualcosa di più trasferibile — rafforzando la conclusione che augmentation aggressiva + ensemble non sia un ottimo locale facilmente migliorabile con interventi leggeri, almeno su questa coppia di dataset.</p>
+<p>None of the three beats the recommended configuration. The pattern is nonetheless informative: three very different mechanisms fail in the same way — either introducing a shortcut specific to the source domain, or disturbing useful information without replacing it with something more transferable — reinforcing the conclusion that aggressive augmentation + ensemble is not a local optimum easily improved with light interventions, at least for this pair of datasets.</p>
 
-<h2>6. Limiti e lavori futuri</h2>
+<h2>6. Limitations and Future Work</h2>
 <ul>
-<li>Appearance/domain adaptation applicata con probabilità &lt;1 invece che sempre attiva, per isolare la causa del costo in-domain osservato.</li>
-<li>Combinare augmentation aggressiva e appearance adaptation, per verificare se gli effetti si sommano.</li>
-<li>Self-training con pseudo-label sul dominio target (setting transduttivo, non ancora tentato).</li>
-<li>Un ensemble esteso anche ai fold, oltre che alle sole architetture.</li>
-<li>Analizzare la causa della maggiore difficoltà osservata sistematicamente sul fold 3 di HemoSet.</li>
-<li>Ripetere gli esperimenti più promettenti sui dati reali del progetto TRAMIS quando disponibili, tenendo conto che mescolare dataset esterni di dimensioni molto diverse non è automaticamente benefico senza bilanciamento esplicito.</li>
-<li>Valutare estensioni basate su backbone Transformer pretrained (es. DINOv3, come nel BorDINO di Giusti &amp; Marzo), fuori dallo scope CNN-based di questo lavoro.</li>
+<li>Applying appearance/domain adaptation with probability &lt;1 instead of always-on, to isolate the cause of the observed in-domain cost.</li>
+<li>Combining aggressive augmentation and appearance adaptation, to check whether the effects add up.</li>
+<li>Self-training with pseudo-labels on the target domain (transductive setting, not yet attempted).</li>
+<li>An ensemble extended to folds as well, not just architectures.</li>
+<li>Investigating the cause of the consistently higher difficulty of HemoSet fold 3.</li>
+<li>Repeating the most promising experiments on real TRAMIS data when available, keeping in mind that mixing external datasets of very different sizes is not automatically beneficial without explicit domain balancing.</li>
+<li>Evaluating extensions based on pretrained Transformer backbones (e.g., DINOv3, as in the BorDINO model by Giusti &amp; Marzo), outside the CNN-based scope of this work.</li>
 </ul>
 
-<h2>7. Conclusioni</h2>
-<p>Questo lavoro ha quantificato in modo sistematico il domain gap asimmetrico tra HemoSet e Rabbani, e ha confrontato sei famiglie di strategie per aumentare la robustezza cross-dataset dei modelli di segmentazione del sangue in chirurgia. La <strong>data augmentation aggressiva</strong> è risultata la strategia più efficace e a più basso costo; la sua combinazione con un <strong>ensemble di tre architetture</strong> produce il miglior risultato complessivo, senza training aggiuntivo oltre a quello già necessario per l'augmentation. Tre estensioni ulteriori non hanno migliorato questo risultato, ma supportano l'ipotesi che il fattore chiave sia preservare l'esposizione del modello alla distribuzione "pulita" del proprio dominio durante il training, piuttosto che imporre invarianza tramite segnali o normalizzazioni calcolate direttamente sui dati.</p>
+<h2>7. Conclusions</h2>
+<p>This work systematically quantified the asymmetric domain gap between HemoSet and Rabbani, and compared six families of strategies for increasing the cross-dataset robustness of surgical blood segmentation models. <strong>Aggressive data augmentation</strong> proved to be the most effective and lowest-cost strategy; combined with an <strong>ensemble of three architectures</strong>, it produces the best overall result, with no additional training beyond what augmentation already requires. Three further extensions did not improve on this result, but support the hypothesis that the key factor is preserving the model's exposure to the "clean" distribution of its own domain during training, rather than imposing invariance through signals or normalizations computed directly on the data.</p>
 
-<h2>8. Riferimenti bibliografici</h2>
+<h2>8. References</h2>
 <div class="biblio">
 <ol>
 <li>A. J. Miao, S. Lin, J. Lu, F. Richter, B. Ostrander, E. K. Funk, R. K. Orosco, M. C. Yip. "HemoSet: The First Blood Segmentation Dataset for Automation of Hemostasis Management." <em>International Symposium on Medical Robotics (ISMR)</em>, 2024.</li>
@@ -279,7 +279,7 @@
 <li>K. Zhou, Y. Yang, Y. Qiao, T. Xiang. "Domain Generalization with MixStyle." <em>ICLR</em>, 2021.</li>
 <li>Y. Li, N. Wang, J. Shi, J. Liu, X. Hou. "Revisiting Batch Normalization For Practical Domain Adaptation." <em>arXiv:1603.04779</em>, 2016.</li>
 <li>Su et al. <em>AAAI Conference on Artificial Intelligence</em>, 2023.</li>
-<li>F. Giusti, F. Marzo. Report di progetto, Computer Vision and Cognitive Systems, UNIMORE, A.A. 2025/2026.</li>
+<li>F. Giusti, F. Marzo. Project report, Computer Vision and Cognitive Systems, UNIMORE, A.Y. 2025/2026.</li>
 </ol>
 </div>
 
