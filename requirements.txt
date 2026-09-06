@@ -1,2 +1,15 @@
+# Core deep learning stack. Install torch/torchvision first with the build
+# matching your CUDA driver, e.g. on the AImageLab-HPC cluster (driver <= CUDA 12.2):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+# On a generic machine with a recent NVIDIA driver, a plain
+#   pip install torch torchvision
+# (or the CPU-only build) is usually fine instead.
+torch>=2.0
+torchvision>=0.15
+
 segmentation-models-pytorch
+albumentations
+opencv-python
+numpy
 scipy
+scikit-learn
