@@ -66,8 +66,8 @@ pip install -r requirements.txt
 
 Datasets are **not included** in the repository (see `.gitignore`) and must be downloaded separately:
 
-- HemoSet — Miao et al., ISMR 2024. <!-- TODO: add the exact download link used -->
-- Rabbani et al. — MIDL 2022. <!-- TODO: add the exact download link used -->
+- HemoSet — Miao et al., ISMR 2024: [Google Drive folder](https://drive.google.com/drive/folders/19-2cHwDslxjDelMioHvTV1ToFKzOAqbd).
+- Rabbani et al. — MIDL 2022: [dataset archive](https://web.archive.org/web/20220705182845if_/http://igt.ip.uca.fr/~ab/code_and_datasets/datasets/bleeding_segmentation_v1p0.zip) (mirrored via the Wayback Machine; the original host is no longer reliably reachable).
 
 Place them under `datasets/` (path configurable via `--data-dir`, default `/work/cvcs2026/bleedsense/datasets` for cluster runs) with this layout, expected by `dataset.py`:
 
