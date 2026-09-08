@@ -115,17 +115,21 @@ Figures~\ref{fig:qual-h2r} and~\ref{fig:qual-r2h} show representative examples f
 
 % TODO: generate with `python visualize_predictions.py` on the cluster, then
 % copy results/qualitative/*.png into this Overleaf project's figures/ folder.
+% Each figure stacks two examples to show the pattern is consistent, not cherry-picked;
+% drop the second \includegraphics (and shorten the caption) if space runs short.
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.95\textwidth]{figures/hemoset_to_rabbani_ex1.png}
-\caption{HemoSet$\rightarrow$Rabbani example: image, ground truth, baseline, aggressive augmentation, ensemble.}
+\includegraphics[width=0.95\textwidth]{figures/hemoset_to_rabbani_ex1.png}\\[2pt]
+\includegraphics[width=0.95\textwidth]{figures/hemoset_to_rabbani_ex2.png}
+\caption{HemoSet$\rightarrow$Rabbani, two examples: image, ground truth, baseline, aggressive augmentation, ensemble.}
 \label{fig:qual-h2r}
 \end{figure*}
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.95\textwidth]{figures/rabbani_to_hemoset_ex1.png}
-\caption{Rabbani$\rightarrow$HemoSet example: image, ground truth, baseline, aggressive augmentation, ensemble.}
+\includegraphics[width=0.95\textwidth]{figures/rabbani_to_hemoset_ex1.png}\\[2pt]
+\includegraphics[width=0.95\textwidth]{figures/rabbani_to_hemoset_ex2.png}
+\caption{Rabbani$\rightarrow$HemoSet, two examples: image, ground truth, baseline, aggressive augmentation, ensemble.}
 \label{fig:qual-r2h}
 \end{figure*}
 
