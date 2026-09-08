@@ -32,6 +32,7 @@ semantic segmentation, domain generalization, cross-dataset robustness, surgical
 \end{IEEEkeywords}
 
 \section{Introduction and Motivation}
+\label{sec:intro}
 
 Automating hemostasis management in robotic surgery -- identifying and controlling bleeding during the procedure -- requires, as a first step, reliable segmentation of blood in the endoscopic field of view. This project is part of the TRAMIS research initiative, focused on real-time bleeding detection in robotic surgery; since real, annotated TRAMIS surgical data were not yet available at the time of this work, the study was conducted on two public reference datasets in the domain, used as proxies:
 
@@ -46,7 +47,7 @@ Previous work from the research group \cite{giusti2026report} had observed an \e
 
 \section{Related Work}
 
-Miao et al.~\cite{miao2024hemoset} introduced the HemoSet dataset and benchmarked standard segmentation models with IoU/F1/Hausdorff Distance metrics. Rabbani et al.~\cite{rabbani2022midl} proposed a dataset and segmentation system for laparoscopic bleeding with an adversarial domain adaptation component, evaluated with IoU and F-Score. Yang and Soatto~\cite{yang2020fda} introduced Fourier Domain Adaptation (FDA), swapping low-frequency amplitude components in the Fourier spectrum, used here as an appearance adaptation method (Section~\ref{sec:results-b}). Reinhard et al.~\cite{reinhard2001color} proposed statistical color transfer in L*a*b* space, the second appearance adaptation method used. Zhou et al.~\cite{zhou2021mixstyle} proposed MixStyle, feature-level style mixing for domain generalization, used here as an extension (Section~\ref{sec:extensions}). Li et al.~\cite{li2016adabn} proposed AdaBN, test-time BatchNorm recalibration for domain adaptation, also used as an extension. Su et al.~\cite{su2023aaai} studied single-source domain generalization via augmentation, informing the interpretation of our augmentation results. Teevno et al.~\cite{teevno2024cbms} proposed style-content disentanglement for domain generalization in endoscopic segmentation, a more architecture-heavy alternative to the strategies compared in this work. Finally, Giusti and Marzo~\cite{giusti2026report}, in a previous project from the same course, first quantified the asymmetric domain gap between HemoSet and Rabbani (zero-shot Dice: HemoSet$\rightarrow$Rabbani 0.29, Rabbani$\rightarrow$HemoSet 0.56), qualitatively consistent with our Section~\ref{sec:results-a} despite different splits and hyperparameters.
+Miao et al.~\cite{miao2024hemoset} introduced the HemoSet dataset and benchmarked standard segmentation models with IoU/F1/Hausdorff Distance metrics. Rabbani et al.~\cite{rabbani2022midl} proposed a dataset and segmentation system for laparoscopic bleeding with an adversarial domain adaptation component, evaluated with IoU and F-Score. Yang and Soatto~\cite{yang2020fda} introduced Fourier Domain Adaptation (FDA), swapping low-frequency amplitude components in the Fourier spectrum, used here as an appearance adaptation method (Section~\ref{sec:results-b}). Reinhard et al.~\cite{reinhard2001color} proposed statistical color transfer in L*a*b* space, the second appearance adaptation method used. Zhou et al.~\cite{zhou2021mixstyle} proposed MixStyle, feature-level style mixing for domain generalization, used here as an extension (Section~\ref{sec:extensions}). Li et al.~\cite{li2016adabn} proposed AdaBN, test-time BatchNorm recalibration for domain adaptation, also used as an extension. Su et al.~\cite{su2023aaai} studied single-source domain generalization via augmentation, informing the interpretation of our augmentation results. Teevno et al.~\cite{teevno2024cbms} proposed style-content disentanglement for domain generalization in endoscopic segmentation, a more architecture-heavy alternative to the strategies compared in this work. Finally, Giusti and Marzo~\cite{giusti2026report}, in a previous project from the same course, first quantified the asymmetric domain gap between HemoSet and Rabbani (zero-shot Dice: HemoSet$\rightarrow$Rabbani 0.29, Rabbani$\rightarrow$HemoSet 0.56), qualitatively consistent with our Section~\ref{sec:results-a} despite different splits and hyperparameters. Relative to Rabbani et al.'s own adversarial domain adaptation module and Teevno et al.'s style-content disentanglement, both of which require dedicated architectural components, this work deliberately favors simpler, more easily reproducible interventions -- augmentation, color/frequency-based appearance transfer, and ensembling -- to first isolate which basic mechanisms actually drive cross-dataset robustness, before layering on more complex architectural solutions.
 
 \section{Approach}
 
@@ -60,7 +61,7 @@ We use three standard architectures via \texttt{segmentation\_models\_pytorch}, 
 
 \subsection{Metrics and Evaluation Protocol}
 
-We report Dice, IoU, Precision, Recall, F1, and HD95 (95th-percentile Hausdorff Distance). This set fully covers the metrics used in the original papers of both datasets, with HD95 preferred over the maximum HD because it is less sensitive to single-pixel outliers. A model trained on HemoSet is evaluated in-domain on the validation fold and cross-dataset on the fixed Rabbani test set; a model trained on Rabbani is evaluated in-domain on its own fixed test set and cross-dataset on the whole of HemoSet (never seen during training).
+We report Dice, IoU, Precision, Recall, F1, and HD95 (95th-percentile Hausdorff Distance). This set fully covers the metrics used in the original papers of both datasets, with HD95 preferred over the maximum HD because it is less sensitive to single-pixel outliers. A model trained on HemoSet is evaluated in-domain on the validation fold and cross-dataset on the fixed Rabbani test set; a model trained on Rabbani is evaluated in-domain on its own fixed test set and cross-dataset on the whole of HemoSet (never seen during training). We note that this makes the two datasets' results statistically asymmetric: HemoSet figures are mean $\pm$ standard deviation over 5 folds, while Rabbani (which has no natural grouping variable to fold over) contributes a single run -- Rabbani numbers should therefore be read with correspondingly more caution.
 
 \section{Results}
 
@@ -78,7 +79,9 @@ Training on the union of HemoSet and Rabbani (joint training, with separate held
 
 \subsection{Ensemble of the Three Architectures}
 
-As an original contribution beyond the assigned roadmap, we ensembled the three architectures' predictions at zero additional training cost, simply averaging the sigmoid probabilities of the already-trained aggressive-augmentation checkpoints. The result beats the best single model on all four tested conditions, with modest but systematic, exception-free gains (e.g., HemoSet$\rightarrow$Rabbani: 0.337 best single model $\rightarrow$ 0.343 ensemble; Rabbani$\rightarrow$HemoSet: 0.615 $\rightarrow$ 0.623).
+As an original contribution beyond the assigned roadmap, we ensembled the three architectures' predictions at zero additional training cost, simply averaging the sigmoid probabilities of the already-trained aggressive-augmentation checkpoints. The result beats the best single model on all four tested conditions, with modest but systematic, exception-free gains (e.g., HemoSet$\rightarrow$Rabbani: 0.337 best single model $\rightarrow$ 0.343 ensemble; Rabbani$\rightarrow$HemoSet: 0.615 $\rightarrow$ 0.623). This is consistent with the standard ensembling rationale: errors made independently by architecturally different models tend to disagree and partially cancel out when their probabilities are averaged, while the shared, correct signal is reinforced.
+
+A practical caveat is worth noting given this project's real-time motivation (Section~\ref{sec:intro}): the ensemble triples inference cost (three forward passes instead of one) relative to a single model. This is a favorable trade-off for the offline evaluation performed here, but a deployed real-time bleeding-detection system would need to weigh the modest gains reported above against this added latency, or fall back to aggressive augmentation alone -- which is already the single most effective and cheapest strategy tested -- if strict real-time constraints apply.
 
 \subsection{Comparative Summary}
 
@@ -173,7 +176,7 @@ Figures~\ref{fig:qual-h2r} and~\ref{fig:qual-r2h} show representative examples f
 
 \subsection{Why Augmentation Beats Adaptation and Joint Training}
 
-The common factor behind the two less effective strategies -- always-active appearance adaptation, imbalanced joint training -- appears to be the lack of a mechanism that still preserves the model's exposure to the ``clean'' distribution of its own source domain during training. A light, probabilistic intervention on visual variety beats more targeted but always-active interventions on style, or simply mixing the data together.
+The common factor behind the two less effective strategies -- always-active appearance adaptation, imbalanced joint training -- appears to be the lack of a mechanism that still preserves the model's exposure to the ``clean'' distribution of its own source domain during training. A light, probabilistic intervention on visual variety beats more targeted but always-active interventions on style, or simply mixing the data together. This is visually corroborated by the qualitative examples in Figs.~\ref{fig:qual-h2r}--\ref{fig:qual-r2h}: aggressive augmentation and the ensemble progressively recover the recall lost by the source-only baseline on HemoSet$\rightarrow$Rabbani, and reduce -- without fully eliminating -- the over-segmentation observed in the opposite direction.
 
 \subsection{Three Further Extensions (Negative but Informative Outcome)}
 \label{sec:extensions}
@@ -191,6 +194,7 @@ None of the three beats the recommended configuration. The pattern is nonetheles
 \section{Limitations and Future Work}
 
 \begin{itemize}
+\item Repeating the Rabbani runs with multiple seeds (or an alternative resampling scheme, since Rabbani has no natural grouping variable to fold over as HemoSet does) to obtain a variance estimate comparable to HemoSet's 5-fold results.
 \item Applying appearance/domain adaptation with probability $<1$ instead of always-on, to isolate whether this is indeed the cause of the observed in-domain cost.
 \item Combining aggressive augmentation and appearance adaptation, to check whether the effects add up.
 \item Self-training with pseudo-labels on the target domain (transductive setting, not yet attempted).
