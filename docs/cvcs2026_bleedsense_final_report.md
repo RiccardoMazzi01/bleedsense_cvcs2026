@@ -35,6 +35,7 @@ Previous work from the research group (Giusti & Marzo, CVCS 2025/2026 project re
 - **Zhou et al.**, "Domain Generalization with MixStyle", ICLR 2021 — feature-level style mixing, used as an extension (Section 5.2).
 - **Li et al.**, "Revisiting Batch Normalization For Practical Domain Adaptation" (AdaBN), 2016 — test-time BatchNorm recalibration, used as an extension (Section 5.2).
 - **Su et al.**, AAAI 2023 — single-source domain generalization via augmentation.
+- **Teevno et al.**, "Domain Generalization for Endoscopic Image Segmentation by Disentangling Style-Content Information and SuperPixel Consistency", CBMS 2024 — style-content disentanglement for domain generalization in endoscopic segmentation; a complementary, more architecture-heavy alternative to the augmentation- and adaptation-based strategies compared in this work.
 - **Giusti & Marzo**, CVCS 2025/2026 project report — first quantification of the asymmetric domain gap between HemoSet and Rabbani (zero-shot Dice: HemoSet→Rabbani 0.29, Rabbani→HemoSet 0.56), qualitatively consistent with Section 4.1 despite different splits/hyperparameters.
 
 ---
@@ -123,6 +124,7 @@ None of the three beats the recommended configuration. The pattern is nonetheles
 - Applying appearance/domain adaptation with probability <1 (augmentation-style) instead of always-on, to isolate whether this is indeed the cause of the observed in-domain cost.
 - Combining aggressive augmentation and appearance adaptation, to check whether the effects add up.
 - Self-training with pseudo-labels on the target domain (transductive setting, not yet attempted in this work).
+- Style-content disentanglement (Teevno et al., CBMS 2024), a more architecture-heavy alternative to the augmentation/adaptation strategies compared here, not explored in this work.
 - An ensemble extended to folds as well, not just architectures.
 - Investigating the cause of the consistently observed higher difficulty of HemoSet fold 3.
 - When available, repeating the most promising experiments (aggressive augmentation + ensemble first) on real TRAMIS data, keeping in mind that mixing external datasets of very different sizes into training is not automatically beneficial without explicit domain balancing.
@@ -145,4 +147,5 @@ This work systematically quantified the asymmetric domain gap between HemoSet an
 5. K. Zhou, Y. Yang, Y. Qiao, T. Xiang. "Domain Generalization with MixStyle." *International Conference on Learning Representations (ICLR)*, 2021.
 6. Y. Li, N. Wang, J. Shi, J. Liu, X. Hou. "Revisiting Batch Normalization For Practical Domain Adaptation." *arXiv:1603.04779*, 2016.
 7. Su et al. *AAAI Conference on Artificial Intelligence*, 2023. (single-source domain generalization via augmentation)
-8. F. Giusti, F. Marzo. Project report, Computer Vision and Cognitive Systems, UNIMORE, A.Y. 2025/2026.
+8. M. A. Teevno et al. "Domain Generalization for Endoscopic Image Segmentation by Disentangling Style-Content Information and SuperPixel Consistency." *IEEE International Symposium on Computer-Based Medical Systems (CBMS)*, 2024.
+9. F. Giusti, F. Marzo. Project report, Computer Vision and Cognitive Systems, UNIMORE, A.Y. 2025/2026.
