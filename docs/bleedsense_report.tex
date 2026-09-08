@@ -4,6 +4,8 @@
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{amsmath}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
 \usepackage[hidelinks]{hyperref}
 
 \begin{document}
@@ -105,6 +107,41 @@ Balanced joint training       & 0.739 & 0.656 & n/a$^*$ & n/a$^*$ \\
 \vspace{2pt}
 \footnotesize{$^*$joint training is evaluated in-domain on both test sets, so there is no comparable cross-dataset condition for this row.}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    bar width=3.2pt,
+    width=\columnwidth,
+    height=4.4cm,
+    ymin=0, ymax=0.85,
+    ylabel={Dice},
+    ylabel style={font=\scriptsize},
+    symbolic x coords={HemoSet,Rabbani,H2R,R2H},
+    xtick=data,
+    xticklabels={HemoSet (in-dom.), Rabbani (in-dom.), H$\to$R (cross), R$\to$H (cross)},
+    x tick label style={font=\tiny},
+    y tick label style={font=\tiny},
+    legend style={font=\tiny, at={(0.5,1.35)}, anchor=north, legend columns=4, column sep=3pt},
+    enlarge x limits=0.15,
+    axis lines*=left,
+    clip=false,
+]
+\addplot coordinates {(HemoSet,0.745) (Rabbani,0.684) (H2R,0.217) (R2H,0.585)};
+\addplot coordinates {(HemoSet,0.747) (Rabbani,0.681) (H2R,0.321) (R2H,0.601)};
+\addplot coordinates {(HemoSet,0.719) (Rabbani,0.611) (H2R,0.263) (R2H,0.577)};
+\addplot coordinates {(HemoSet,0.720) (Rabbani,0.675) (H2R,0.242) (R2H,0.550)};
+\addplot coordinates {(HemoSet,0.742) (Rabbani,0.636)};
+\addplot coordinates {(HemoSet,0.739) (Rabbani,0.656)};
+\addplot coordinates {(HemoSet,0.770) (Rabbani,0.706) (H2R,0.343) (R2H,0.623)};
+\legend{Baseline, Aggr.\ aug., Reinhard, FDA, Joint nat., Joint bal., Ensemble}
+\end{axis}
+\end{tikzpicture}
+\caption{Mean Dice by strategy and evaluation condition (averaged over the 3 architectures). Joint training bars are omitted in the cross-dataset columns (not applicable, see Table~\ref{tab:summary}).}
+\label{fig:chart}
+\end{figure}
 
 \textbf{Recommended configuration}: aggressive augmentation in training + ensemble of the three architectures at inference -- the only combination that improves cross-dataset robustness in both directions without penalizing in-domain performance.
 
