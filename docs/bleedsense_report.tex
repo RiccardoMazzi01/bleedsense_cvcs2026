@@ -121,7 +121,6 @@ Balanced joint training       & 0.739 & 0.656 & n/a$^*$ & n/a$^*$ \\
     ylabel style={font=\scriptsize},
     symbolic x coords={HemoSet,Rabbani,H2R,R2H},
     xtick=data,
-    xticklabels={{HemoSet (in-dom.)},{Rabbani (in-dom.)},{H$\to$R (cross)},{R$\to$H (cross)}},
     x tick label style={font=\tiny},
     y tick label style={font=\tiny},
     legend style={font=\tiny, at={(0.5,1.35)}, anchor=north, legend columns=4, column sep=3pt},
@@ -139,7 +138,7 @@ Balanced joint training       & 0.739 & 0.656 & n/a$^*$ & n/a$^*$ \\
 \legend{Baseline, Aggr.\ aug., Reinhard, FDA, Joint nat., Joint bal., Ensemble}
 \end{axis}
 \end{tikzpicture}
-\caption{Mean Dice by strategy and evaluation condition (averaged over the 3 architectures). Joint training bars are omitted in the cross-dataset columns (not applicable, see Table~\ref{tab:summary}).}
+\caption{Mean Dice by strategy and evaluation condition (averaged over the 3 architectures). HemoSet/Rabbani = in-domain; H2R = HemoSet$\to$Rabbani (cross); R2H = Rabbani$\to$HemoSet (cross). Joint training bars are omitted in the cross-dataset columns (not applicable, see Table~\ref{tab:summary}).}
 \label{fig:chart}
 \end{figure}
 
