@@ -104,6 +104,7 @@
 <li><strong>Teevno et al.</strong>, "Domain Generalization for Endoscopic Image Segmentation by Disentangling Style-Content Information and SuperPixel Consistency", CBMS 2024 — style-content disentanglement for domain generalization in endoscopic segmentation, a complementary alternative to the strategies compared here.</li>
 <li><strong>Giusti &amp; Marzo</strong>, CVCS 2025/2026 project report — first quantification of the asymmetric domain gap (zero-shot Dice: HemoSet→Rabbani 0.29, Rabbani→HemoSet 0.56), consistent with Sec. 4.1 despite different splits/hyperparameters.</li>
 </ul>
+<p>Relative to Rabbani et al.'s own adversarial domain adaptation module and Teevno et al.'s style-content disentanglement, both of which require dedicated architectural components, this work deliberately favors simpler, more easily reproducible interventions — augmentation, color/frequency-based appearance transfer, and ensembling — to first isolate which basic mechanisms actually drive cross-dataset robustness, before layering on more complex architectural solutions.</p>
 
 <h2>3. Approach</h2>
 <h3>3.1 Datasets and Splits</h3>
@@ -111,7 +112,7 @@
 <h3>3.2 Architectures and Training Protocol</h3>
 <p>Three standard architectures via <code>segmentation_models_pytorch</code>, same <code>resnet34</code> encoder: <strong>UNet</strong>, <strong>UNet++</strong>, <strong>DeepLabV3+</strong>. Dice+BCE loss, AdamW (lr 1e-4), <code>ReduceLROnPlateau</code>, batch size 8, 256×256 images, the full dataset for each split. Early stopping on validation Dice (patience 8, cap of 40 epochs) — empirically verified across all 87 Phase 1-4 runs that this budget was sufficient (only 2/87 runs reached the cap, with a residual &lt;0.01 Dice). The exact same configuration was used for every condition compared, to isolate the single variable under study.</p>
 <h3>3.3 Metrics and Evaluation Protocol</h3>
-<p>Dice, IoU, Precision, Recall, F1, <strong>HD95</strong> — this set fully covers the metrics of the original papers of both datasets. A model trained on HemoSet is evaluated in-domain on the validation fold and cross-dataset on the fixed Rabbani test set; a model trained on Rabbani is evaluated in-domain on its own test set and cross-dataset on the whole of HemoSet (never seen during training).</p>
+<p>Dice, IoU, Precision, Recall, F1, <strong>HD95</strong> — this set fully covers the metrics of the original papers of both datasets. A model trained on HemoSet is evaluated in-domain on the validation fold and cross-dataset on the fixed Rabbani test set; a model trained on Rabbani is evaluated in-domain on its own test set and cross-dataset on the whole of HemoSet (never seen during training). Note that this makes the two datasets' results statistically asymmetric: HemoSet figures are mean ± standard deviation over 5 folds, while Rabbani (no natural grouping variable to fold over) contributes a single run — Rabbani numbers should be read with correspondingly more caution.</p>
 
 <h2>4. Results</h2>
 <h3>4.1 Baseline and Domain Gap Asymmetry</h3>
@@ -122,7 +123,8 @@
 <p><strong>Joint training</strong> (union of HemoSet and Rabbani, separate held-out test sets) is not a solution: no systematic benefit on HemoSet, systematic drop on Rabbani (0.684→0.636) caused by the size imbalance between the two datasets (~59%/41%). A balanced sampling scheme (<code>WeightedRandomSampler</code>) recovers only about half of the drop (→0.656), without making the strategy competitive.</p>
 
 <h3>4.3 Ensemble of the Three Architectures</h3>
-<p>As an original contribution, the three architectures' predictions were ensembled — at zero additional training cost (averaging the sigmoid probabilities of the already-trained aggressive-augmentation checkpoints). The result beats the best single model on <strong>all four</strong> tested conditions (e.g., HemoSet→Rabbani: 0.337 best single model → 0.343; Rabbani→HemoSet: 0.615 → 0.623).</p>
+<p>As an original contribution, the three architectures' predictions were ensembled — at zero additional training cost (averaging the sigmoid probabilities of the already-trained aggressive-augmentation checkpoints). The result beats the best single model on <strong>all four</strong> tested conditions (e.g., HemoSet→Rabbani: 0.337 best single model → 0.343; Rabbani→HemoSet: 0.615 → 0.623). This is consistent with the standard ensembling rationale: errors made independently by architecturally different models tend to disagree and partially cancel out when their probabilities are averaged, while the shared, correct signal is reinforced.</p>
+<p>A practical caveat is worth noting given this project's real-time motivation (Sec. 1): the ensemble triples inference cost (three forward passes instead of one) relative to a single model. This is a favorable trade-off for the offline evaluation performed here, but a deployed real-time bleeding-detection system would need to weigh the modest gains above against this added latency, or fall back to aggressive augmentation alone — already the single most effective and cheapest strategy tested — if strict real-time constraints apply.</p>
 
 <h3>4.4 Comparative Summary</h3>
 <p>Mean over the three architectures for each strategy (full per-architecture breakdown in the supplementary materials):</p>
@@ -235,9 +237,22 @@
 <p class="figure-caption">Fig. 1 — Mean Dice by strategy (averaged over 3 architectures). Natural/balanced joint training omitted in the cross-dataset columns (not applicable, evaluated in-domain on both domains). Full values in the table above.</p>
 </div>
 
+<h3>4.5 Qualitative Results</h3>
+<p>Two examples per cross-dataset direction, comparing the ground-truth mask against the predictions of the source-only baseline, the aggressive-augmentation model, and the ensemble, overlaid on the original image. The baseline's under-segmentation (missed blood, low recall) on HemoSet→Rabbani, and its over-segmentation (false positives) on Rabbani→HemoSet, are visually apparent and progressively mitigated by aggressive augmentation and further by the ensemble.</p>
+<div class="figure">
+<img src="../results/qualitative/hemoset_to_rabbani_ex2.png" alt="HemoSet to Rabbani qualitative example 1" style="width:100%; border:1px solid #e1e0d9;">
+<img src="../results/qualitative/hemoset_to_rabbani_ex1.png" alt="HemoSet to Rabbani qualitative example 2" style="width:100%; border:1px solid #e1e0d9; margin-top:6px;">
+<p class="figure-caption">Fig. 2 — HemoSet→Rabbani, two examples: image, ground truth, baseline, aggressive augmentation, ensemble.</p>
+</div>
+<div class="figure">
+<img src="../results/qualitative/rabbani_to_hemoset_ex3.png" alt="Rabbani to HemoSet qualitative example 1" style="width:100%; border:1px solid #e1e0d9;">
+<img src="../results/qualitative/rabbani_to_hemoset_ex1.png" alt="Rabbani to HemoSet qualitative example 2" style="width:100%; border:1px solid #e1e0d9; margin-top:6px;">
+<p class="figure-caption">Fig. 3 — Rabbani→HemoSet, two examples: image, ground truth, baseline, aggressive augmentation, ensemble.</p>
+</div>
+
 <h2>5. Discussion</h2>
 <h3>5.1 Why Augmentation Beats Adaptation and Joint Training</h3>
-<p>The common factor behind the two less effective strategies — always-active appearance adaptation, imbalanced joint training — appears to be the lack of a mechanism that still preserves the model's exposure to the "clean" distribution of its own source domain during training. A <strong>light, probabilistic</strong> intervention on visual variety beats more targeted but <strong>always-active</strong> interventions on style, or simply mixing the data together.</p>
+<p>The common factor behind the two less effective strategies — always-active appearance adaptation, imbalanced joint training — appears to be the lack of a mechanism that still preserves the model's exposure to the "clean" distribution of its own source domain during training. A <strong>light, probabilistic</strong> intervention on visual variety beats more targeted but <strong>always-active</strong> interventions on style, or simply mixing the data together. This is visually corroborated by the qualitative examples in Figs. 2–3: aggressive augmentation and the ensemble progressively recover the recall lost by the source-only baseline on HemoSet→Rabbani, and reduce — without fully eliminating — the over-segmentation observed in the opposite direction.</p>
 
 <h3>5.2 Three Further Extensions (Negative but Informative Outcome)</h3>
 <p>After identifying the recommended configuration, three additional original extensions were attempted:</p>
@@ -258,6 +273,7 @@
 
 <h2>6. Limitations and Future Work</h2>
 <ul>
+<li>Repeating the Rabbani runs with multiple seeds (or an alternative resampling scheme, since Rabbani has no natural grouping variable to fold over) to obtain a variance estimate comparable to HemoSet's 5-fold results.</li>
 <li>Applying appearance/domain adaptation with probability &lt;1 instead of always-on, to isolate the cause of the observed in-domain cost.</li>
 <li>Combining aggressive augmentation and appearance adaptation, to check whether the effects add up.</li>
 <li>Self-training with pseudo-labels on the target domain (transductive setting, not yet attempted).</li>
