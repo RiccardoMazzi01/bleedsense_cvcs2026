@@ -138,6 +138,8 @@ python train.py --dataset hemoset --architecture unet --fold 0 --epochs 2 \
     --data-dir ./datasets --output-dir ./results
 ```
 
+**On exact reproducibility**: `--seed` (default 42) fixes the data splits, model initialization, and augmentation randomness identically across machines, so results on a re-run should land very close to the committed ones (e.g. `results/hemoset_unet_fold0.json`). They are not guaranteed to be bit-identical, however: the code does not force full cuDNN determinism, so results can vary slightly (typically in the third decimal of Dice) across different GPUs/driver versions. This is expected and not a sign of a broken reproduction.
+
 ## Key CLI flags of `train.py`
 
 ```
