@@ -46,13 +46,13 @@ def _boundary(mask):
 
 
 def hausdorff_distance_95(pred, target):
-    """HD95 (in pixel) tra due maschere binarie 2D.
+    """HD95 (in pixels) between two 2D binary masks.
 
-    Implementazione custom via distance transform (scipy), non e' garantita
-    numericamente identica a librerie come medpy/MONAI: va bene per confronti
-    interni al progetto, ma se serve confrontare direttamente coi valori HD95
-    riportati nei paper originali va rivalidata con la stessa libreria che
-    hanno usato loro.
+    Custom implementation via distance transform (scipy); not guaranteed to be
+    numerically identical to libraries like medpy/MONAI: fine for comparisons
+    internal to the project, but if direct comparison with the HD95 values
+    reported in the original papers is needed, it should be re-validated with
+    the same library they used.
     """
     pred = pred.astype(bool)
     target = target.astype(bool)
@@ -77,7 +77,7 @@ def hausdorff_distance_95(pred, target):
 
 
 class MetricTracker:
-    """Accumula le metriche immagine per immagine su un intero DataLoader/epoca."""
+    """Accumulates metrics image by image over an entire DataLoader/epoch."""
 
     def __init__(self, threshold=0.5):
         self.threshold = threshold
@@ -93,7 +93,7 @@ class MetricTracker:
         targets = _to_numpy_binary(target, threshold=0.5, from_logits=False)
 
         for p, t in zip(preds, targets):
-            p2d, t2d = p[0], t[0]  # rimuove la dimensione canale (1, H, W) -> (H, W)
+            p2d, t2d = p[0], t[0]  # drop the channel dimension (1, H, W) -> (H, W)
             self._dice.append(dice_coefficient(p2d, t2d))
             self._iou.append(iou_score(p2d, t2d))
             prec, rec, f1 = precision_recall_f1(p2d, t2d)

@@ -3,9 +3,9 @@ import numpy as np
 
 
 def reinhard_color_transfer(source_rgb, target_rgb):
-    """Color transfer di Reinhard et al. (2001): abbina media e deviazione standard
-    dei canali L*a*b* dell'immagine sorgente a quelli di un'immagine target,
-    lasciando invariata la struttura/contenuto.
+    """Color transfer from Reinhard et al. (2001): matches the mean and standard
+    deviation of the L*a*b* channels of the source image to those of a target
+    image, leaving structure/content unchanged.
     """
     source_lab = cv2.cvtColor(source_rgb, cv2.COLOR_RGB2LAB).astype(np.float32)
     target_lab = cv2.cvtColor(target_rgb, cv2.COLOR_RGB2LAB).astype(np.float32)
@@ -19,12 +19,12 @@ def reinhard_color_transfer(source_rgb, target_rgb):
 
 
 def fda_transfer(source_rgb, target_rgb, beta=0.01):
-    """Fourier Domain Adaptation (Yang & Soatto, CVPR 2020): sostituisce la regione
-    a bassa frequenza dello spettro di ampiezza della sorgente con quella del target
-    (lo 'stile'), mantenendo la fase della sorgente (quindi il contenuto/struttura).
+    """Fourier Domain Adaptation (Yang & Soatto, CVPR 2020): replaces the low-frequency
+    region of the source's amplitude spectrum with the target's (the 'style'), while
+    keeping the source's phase (i.e. content/structure).
 
-    beta controlla la dimensione della regione a bassa frequenza scambiata (frazione
-    di altezza/larghezza); valori piccoli (~0.01-0.05) sono quelli usati nel paper.
+    beta controls the size of the swapped low-frequency region (fraction of
+    height/width); small values (~0.01-0.05) are the ones used in the paper.
     """
     target_resized = cv2.resize(target_rgb, (source_rgb.shape[1], source_rgb.shape[0]))
 

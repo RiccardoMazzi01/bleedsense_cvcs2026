@@ -1,4 +1,4 @@
-# Ensemble delle 3 architetture (augmentation=aggressive)
+# Ensemble of the 3 architectures (augmentation=aggressive)
 
 | Setting | DICE | IOU | PRECISION | RECALL | F1 | HD95 |
 |---|---|---|---|---|---|---|

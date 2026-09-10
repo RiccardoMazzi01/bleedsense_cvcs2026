@@ -1,10 +1,10 @@
 #!/bin/bash
-# Estensione extra (post Fase 5): canale di input aggiuntivo "blood-index" (R/(R+G+B)),
-# pensato per essere meno sensibile a differenze di camera/illuminazione tra HemoSet e
-# Rabbani. Testato sopra la condizione migliore finora (augmentation aggressive), per
-# vedere se migliora ulteriormente la robustezza cross-dataset rispetto alla Fase 2.
-# 3 architetture x (5 fold HemoSet + 1 run Rabbani) = 18 job.
-# Da lanciare da /work/cvcs2026/bleedsense sul cluster.
+# Extra extension (post Phase 5): additional "blood-index" input channel (R/(R+G+B)),
+# meant to be less sensitive to camera/illumination differences between HemoSet and
+# Rabbani. Tested on top of the best condition so far (aggressive augmentation), to
+# see whether it improves cross-dataset robustness further compared to Phase 2.
+# 3 architectures x (5 HemoSet folds + 1 Rabbani run) = 18 jobs.
+# Launch from /work/cvcs2026/bleedsense on the cluster.
 set -e
 
 ARCHITECTURES=(unet unetplusplus deeplabv3plus)

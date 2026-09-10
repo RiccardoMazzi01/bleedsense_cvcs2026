@@ -1,7 +1,7 @@
 #!/bin/bash
-# Sottomette tutti i run della Fase 1 (baseline, augmentation 'light'):
-# 3 architetture x (5 fold HemoSet + 1 run Rabbani) = 18 job.
-# Da lanciare da /work/cvcs2026/bleedsense sul cluster, dopo aver verificato train.sh con un run di debug.
+# Submits all Phase 1 runs (baseline, 'light' augmentation):
+# 3 architectures x (5 HemoSet folds + 1 Rabbani run) = 18 jobs.
+# Launch from /work/cvcs2026/bleedsense on the cluster, after verifying train.sh with a debug run.
 set -e
 
 ARCHITECTURES=(unet unetplusplus deeplabv3plus)

@@ -64,7 +64,7 @@ def main():
     parser.add_argument("--output-dir", default="/work/cvcs2026/bleedsense/results")
     parser.add_argument("--encoder", default="resnet34")
     parser.add_argument("--augmentation", default="aggressive",
-                         help="Condizione i cui checkpoint vengono ensemblati (default: la migliore, Fase 2)")
+                         help="Condition whose checkpoints get ensembled (default: the best one, Phase 2)")
     parser.add_argument("--img-size", type=int, default=256)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--num-workers", type=int, default=4)
@@ -77,7 +77,7 @@ def main():
 
     aug_suffix = f"_aug{args.augmentation}" if args.augmentation != "light" else ""
 
-    # --- Dati condivisi ---
+    # --- Shared data ---
     rabbani_images, rabbani_masks = load_rabbani_data(os.path.join(args.data_dir, "rabbani"))
     (_, _), (_, _), (rabbani_test_img, rabbani_test_mask) = split_rabbani_data(
         rabbani_images, rabbani_masks, seed=SPLIT_SEED
@@ -95,7 +95,7 @@ def main():
 
     results = {"augmentation": args.augmentation, "hemoset_indomain_per_fold": [], "rabbani_cross_per_fold": []}
 
-    # --- Ensemble delle 3 architetture, per ciascun fold HemoSet ---
+    # --- Ensemble of the 3 architectures, for each HemoSet fold ---
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=SPLIT_SEED)
     splits = list(sgkf.split(hemoset_images, hemoset_labels, hemoset_groups))
 
@@ -116,7 +116,7 @@ def main():
         print(f"[fold {fold}] HemoSet in-domain dice={indomain_metrics['dice']:.4f} "
               f"| Rabbani cross dice={cross_metrics['dice']:.4f}", flush=True)
 
-    # --- Ensemble delle 3 architetture, run Rabbani (singolo, nessun fold) ---
+    # --- Ensemble of the 3 architectures, Rabbani run (single, no folds) ---
     run_names = {f"rabbani_{arch}{aug_suffix}": arch for arch in ARCHITECTURES}
     models = load_ensemble(run_names, args.encoder, device, ckpt_dir)
     results["rabbani_indomain"] = ensemble_evaluate(models, rabbani_test_loader, device)
@@ -124,7 +124,7 @@ def main():
     print(f"[rabbani] Rabbani in-domain dice={results['rabbani_indomain']['dice']:.4f} "
           f"| HemoSet cross dice={results['hemoset_cross']['dice']:.4f}", flush=True)
 
-    # --- Riepilogo ---
+    # --- Summary ---
     lines = ["| Setting | DICE | IOU | PRECISION | RECALL | F1 | HD95 |", "|---|---|---|---|---|---|---|"]
 
     for label, per_fold in [("HemoSet -> HemoSet (in-domain, ensemble)", results["hemoset_indomain_per_fold"]),
@@ -143,14 +143,14 @@ def main():
 
     out_path = os.path.join(args.output_dir, f"ensemble_{args.augmentation}_summary.md")
     with open(out_path, "w") as f:
-        f.write(f"# Ensemble delle 3 architetture (augmentation={args.augmentation})\n\n")
+        f.write(f"# Ensemble of the 3 architectures (augmentation={args.augmentation})\n\n")
         f.write(table_md + "\n")
 
     results_json_path = os.path.join(args.output_dir, f"ensemble_{args.augmentation}.json")
     with open(results_json_path, "w") as f:
         json.dump(results, f, indent=2)
 
-    print(f"\nSalvato in {out_path} e {results_json_path}")
+    print(f"\nSaved to {out_path} and {results_json_path}")
 
 
 if __name__ == "__main__":

@@ -68,17 +68,17 @@ def main():
         for aug in AUGMENTATIONS:
             for adapt in ADAPTATIONS:
                 if aug != "light" and adapt != "none":
-                    continue  # combinazione non eseguita in nessuna fase per ora
+                    continue  # combination not run in any phase so far
 
                 for use_bi in BLOOD_INDEX_OPTIONS:
                     if use_bi and not (aug == "aggressive" and adapt == "none"):
-                        continue  # blood-index testato solo sopra la condizione migliore finora
+                        continue  # blood-index tested only on top of the best condition so far
 
                     for use_ms in MIXSTYLE_OPTIONS:
                         if use_ms and not (aug == "light" and adapt == "none" and not use_bi):
-                            continue  # mixstyle testato solo su light/none, isolato dagli altri assi
+                            continue  # mixstyle tested only on light/none, isolated from the other axes
                         if use_bi and use_ms:
-                            continue  # combinazione non eseguita
+                            continue  # combination not run
 
                         h_in, h_cross = summarize_hemoset(arch, aug, adapt, use_bi, use_ms)
                         r_in, r_cross = summarize_rabbani(arch, aug, adapt, use_bi, use_ms)
@@ -90,10 +90,10 @@ def main():
                             rows.append(("Rabbani -> HemoSet (cross)", arch, aug, adapt, use_bi, use_ms, r_cross))
 
     if not rows:
-        print("Nessun risultato trovato in", RESULTS_DIR)
+        print("No results found in", RESULTS_DIR)
         return
 
-    header = ("| Setting | Architettura | Augmentation | Adaptation | BloodIndex | MixStyle | "
+    header = ("| Setting | Architecture | Augmentation | Adaptation | BloodIndex | MixStyle | "
               + " | ".join(m.upper() for m in METRICS) + " |")
     sep = "|---" * (6 + len(METRICS)) + "|"
     lines = [header, sep]
@@ -106,12 +106,12 @@ def main():
 
     out_path = os.path.join(RESULTS_DIR, "results_summary.md")
     with open(out_path, "w") as f:
-        f.write("# BleedSense - Riepilogo risultati (in-domain vs cross-dataset)\n\n")
-        f.write("Media +/- deviazione standard sui 5 fold per HemoSet; run singolo per Rabbani.\n")
-        f.write("Righe assenti se quella combinazione non e' ancora stata eseguita.\n\n")
+        f.write("# BleedSense - Results summary (in-domain vs cross-dataset)\n\n")
+        f.write("Mean +/- standard deviation over the 5 HemoSet folds; single run for Rabbani.\n")
+        f.write("Rows are missing if that combination has not been run yet.\n\n")
         f.write(table_md + "\n")
 
-    print(f"\nSalvato anche in {out_path}")
+    print(f"\nAlso saved to {out_path}")
 
 
 if __name__ == "__main__":

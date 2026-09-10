@@ -26,8 +26,8 @@ METRICS = ["dice", "iou", "precision", "recall", "f1", "hd95"]
 
 
 class UnlabeledImageDataset(Dataset):
-    """Solo immagini (nessuna maschera): usato per ricalibrare le BatchNorm sul pool
-    non annotato del dominio target, stesso principio dei pool di adaptation in Fase 3.
+    """Images only (no masks): used to recalibrate the BatchNorms on the unlabeled
+    target-domain pool, same principle as the adaptation pools in Phase 3.
     """
 
     def __init__(self, image_paths, transform):
@@ -44,17 +44,17 @@ class UnlabeledImageDataset(Dataset):
 
 
 def recalibrate_batchnorm(model, loader, device, max_batches=50):
-    """AdaBN (Li et al., 2016): ricalcola media/varianza delle BatchNorm dell'encoder
-    con forward pass (nessun backward, nessuna etichetta) su immagini non annotate del
-    dominio target, prima della valutazione cross-dataset. Nessun peso aggiornato, solo
-    le statistiche di normalizzazione; costo di un'inferenza extra su poche decine di batch.
+    """AdaBN (Li et al., 2016): recomputes the encoder's BatchNorm mean/variance via a
+    forward pass (no backward, no labels) on unlabeled target-domain images, before
+    cross-dataset evaluation. No weights updated, only the normalization statistics;
+    the cost is one extra inference pass over a few dozen batches.
     """
     for module in model.modules():
         if isinstance(module, nn.BatchNorm2d):
             module.reset_running_stats()
-            module.momentum = None  # media cumulativa esatta sul pool, non EMA
+            module.momentum = None  # exact cumulative average over the pool, not an EMA
 
-    model.train()  # attiva l'aggiornamento delle statistiche BN nel forward
+    model.train()  # enables the BN statistics update in the forward pass
     with torch.no_grad():
         for i, images in enumerate(loader):
             if max_batches is not None and i >= max_batches:
@@ -89,7 +89,7 @@ def main():
     parser.add_argument("--output-dir", default="/work/cvcs2026/bleedsense/results")
     parser.add_argument("--encoder", default="resnet34")
     parser.add_argument("--augmentation", default="aggressive",
-                         help="Condizione i cui checkpoint vengono ricalibrati (default: la migliore, Fase 2)")
+                         help="Condition whose checkpoints get recalibrated (default: the best one, Phase 2)")
     parser.add_argument("--img-size", type=int, default=256)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--num-workers", type=int, default=4)
@@ -103,7 +103,7 @@ def main():
     _, val_tf = get_transforms(img_size)
     aug_suffix = f"_aug{args.augmentation}" if args.augmentation != "light" else ""
 
-    # --- Dati condivisi (stessi split fissi di tutte le fasi) ---
+    # --- Shared data (same fixed splits used across all phases) ---
     rabbani_images, rabbani_masks = load_rabbani_data(os.path.join(args.data_dir, "rabbani"))
     (_, _), (_, _), (rabbani_test_img, rabbani_test_mask) = split_rabbani_data(
         rabbani_images, rabbani_masks, seed=SPLIT_SEED
@@ -127,7 +127,7 @@ def main():
 
     rows = {"hemoset_to_rabbani": {"before": [], "after": []}, "rabbani_to_hemoset": {"before": [], "after": []}}
 
-    # --- HemoSet -> Rabbani: ricalibra su pool Rabbani (train split, mai il test) ---
+    # --- HemoSet -> Rabbani: recalibrate on the Rabbani pool (train split, never the test set) ---
     for arch in ARCHITECTURES:
         for fold in range(5):
             run_name = f"hemoset_{arch}_fold{fold}{aug_suffix}"
@@ -143,7 +143,7 @@ def main():
             rows["hemoset_to_rabbani"]["after"].append(after)
             print(f"[{run_name}] Rabbani cross dice: {before['dice']:.4f} -> {after['dice']:.4f}", flush=True)
 
-    # --- Rabbani -> HemoSet: ricalibra su pool HemoSet (tutto, transduttivo come in Fase 3) ---
+    # --- Rabbani -> HemoSet: recalibrate on the HemoSet pool (all of it, transductive as in Phase 3) ---
     for arch in ARCHITECTURES:
         run_name = f"rabbani_{arch}{aug_suffix}"
         model = get_model(arch, encoder_name=args.encoder).to(device)
@@ -158,29 +158,29 @@ def main():
         rows["rabbani_to_hemoset"]["after"].append(after)
         print(f"[{run_name}] HemoSet cross dice: {before['dice']:.4f} -> {after['dice']:.4f}", flush=True)
 
-    # --- Riepilogo ---
-    lines = ["| Direzione | Fase | " + " | ".join(m.upper() for m in METRICS) + " |",
+    # --- Summary ---
+    lines = ["| Direction | Phase | " + " | ".join(m.upper() for m in METRICS) + " |",
              "|---|---" + "|---" * len(METRICS) + "|"]
     for label, key in [("HemoSet -> Rabbani (cross)", "hemoset_to_rabbani"),
                         ("Rabbani -> HemoSet (cross)", "rabbani_to_hemoset")]:
         for phase in ["before", "after"]:
             values = {m: [r[m] for r in rows[key][phase]] for m in METRICS}
             cells = " | ".join(fmt(values[m]) for m in METRICS)
-            lines.append(f"| {label} | {'senza ricalibrazione' if phase == 'before' else 'con test-time BN recalibration'} | {cells} |")
+            lines.append(f"| {label} | {'without recalibration' if phase == 'before' else 'with test-time BN recalibration'} | {cells} |")
 
     table_md = "\n".join(lines)
     print("\n" + table_md)
 
     out_path = os.path.join(args.output_dir, f"test_time_bn_{args.augmentation}_summary.md")
     with open(out_path, "w") as f:
-        f.write(f"# Test-time BatchNorm recalibration (AdaBN) sopra augmentation={args.augmentation}\n\n")
+        f.write(f"# Test-time BatchNorm recalibration (AdaBN) on top of augmentation={args.augmentation}\n\n")
         f.write(table_md + "\n")
 
     results_json_path = os.path.join(args.output_dir, f"test_time_bn_{args.augmentation}.json")
     with open(results_json_path, "w") as f:
         json.dump(rows, f, indent=2)
 
-    print(f"\nSalvato in {out_path} e {results_json_path}")
+    print(f"\nSaved to {out_path} and {results_json_path}")
 
 
 if __name__ == "__main__":

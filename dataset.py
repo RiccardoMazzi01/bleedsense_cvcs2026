@@ -10,10 +10,10 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
 def compute_blood_index(image_rgb):
-    """Canale extra derivato da RGB, pensato per essere meno sensibile a differenze di
-    camera/illuminazione tra HemoSet e Rabbani rispetto ai canali RGB grezzi: rapporto
-    R/(R+G+B) (excess-red-like index, in [0, 1]), usato in letteratura per evidenziare
-    regioni ematiche in modo relativamente invariante all'esposizione.
+    """Extra channel derived from RGB, meant to be less sensitive to camera/illumination
+    differences between HemoSet and Rabbani than the raw RGB channels: ratio R/(R+G+B)
+    (excess-red-like index, in [0, 1]), used in the literature to highlight hemorrhagic
+    regions in a way that is relatively invariant to exposure.
     """
     img = image_rgb.astype(np.float32)
     r, g, b = img[..., 0], img[..., 1], img[..., 2]
@@ -39,7 +39,7 @@ class MedicalBleedingDataset(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-        mask = (mask > 0).astype(np.float32)  # Binarizzazione (0 o 1)
+        mask = (mask > 0).astype(np.float32)  # binarize (0 or 1)
 
         blood_index = compute_blood_index(image) if self.use_blood_index else None
 
@@ -62,8 +62,8 @@ class MedicalBleedingDataset(Dataset):
             if not isinstance(blood_index, torch.Tensor):
                 blood_index = torch.from_numpy(blood_index)
             blood_index = blood_index.to(image.dtype)
-            # riscalato da [0, 1] a circa [-2, 2], stesso ordine di grandezza dei canali
-            # RGB normalizzati con le statistiche ImageNet usate sopra
+            # rescaled from [0, 1] to roughly [-2, 2], the same order of magnitude as the
+            # RGB channels normalized above with the ImageNet statistics
             blood_index = (blood_index - 0.5) * 4.0
             if blood_index.ndim == 2:
                 blood_index = blood_index.unsqueeze(0)
@@ -72,8 +72,8 @@ class MedicalBleedingDataset(Dataset):
         return image, mask
 
 def get_transforms(img_size=(256, 256), use_blood_index=False):
-    # blood_index e' registrato come target di tipo 'mask': riceve solo le trasformazioni
-    # geometriche (resize/flip), non quelle di colore, dato che non e' un canale RGB.
+    # blood_index is registered as a target of type 'mask': it only receives the
+    # geometric transforms (resize/flip), not the color ones, since it's not an RGB channel.
     additional_targets = {"blood_index": "mask"} if use_blood_index else None
 
     train_transform = A.Compose([
@@ -94,17 +94,17 @@ def get_transforms(img_size=(256, 256), use_blood_index=False):
 
 
 class AdaptedBleedingDataset(MedicalBleedingDataset):
-    """Come MedicalBleedingDataset, ma prima del transform applica una funzione di
-    appearance/domain adaptation (Reinhard, FDA, ...) usando un'immagine campionata
-    a caso da un pool di immagini non annotate del dominio target (Fase 3).
+    """Like MedicalBleedingDataset, but before the transform it applies an
+    appearance/domain adaptation function (Reinhard, FDA, ...) using an image sampled
+    at random from a pool of unlabeled target-domain images (Phase 3).
     """
 
     def __init__(self, image_paths, mask_paths, target_image_paths, adapt_fn, transform=None, work_size=(256, 256)):
         super().__init__(image_paths, mask_paths, transform=transform)
         self.target_image_paths = target_image_paths
         self.adapt_fn = adapt_fn
-        self.work_size = work_size  # ridimensiona prima dell'adaptation: FDA fa una FFT per canale,
-        # farla a piena risoluzione sarebbe inutilmente lento dato che il modello lavora a work_size
+        self.work_size = work_size  # resize before adaptation: FDA does a per-channel FFT,
+        # doing it at full resolution would be needlessly slow since the model works at work_size anyway
 
     def __getitem__(self, idx):
         img_path = self.image_paths[idx]
@@ -141,7 +141,7 @@ class AdaptedBleedingDataset(MedicalBleedingDataset):
 def load_hemoset_data(hemoset_dir):
     image_paths = []
     mask_paths = []
-    groups = []  # ID maiale (es. pig1, pig2...)
+    groups = []  # pig ID (e.g. pig1, pig2...)
     has_bleeding = []
 
     pig_folders = sorted(glob.glob(os.path.join(hemoset_dir, "pig*")))
@@ -155,12 +155,12 @@ def load_hemoset_data(hemoset_dir):
         for img_p in imgs:
             fname = os.path.basename(img_p)
 
-            # Gestione suffisso _mask.png
+            # Handle the _mask.png suffix
             ext = os.path.splitext(fname)[1]
             mask_fname = fname.replace(ext, f"_mask{ext}")
             mask_p = os.path.join(mask_dir, mask_fname)
 
-            # Fallback se la maschera ha lo stesso identico nome
+            # Fallback if the mask has the exact same name
             if not os.path.exists(mask_p):
                 mask_p = os.path.join(mask_dir, fname)
 
@@ -185,10 +185,10 @@ def load_rabbani_data(rabbani_dir):
 
 
 def split_rabbani_data(image_paths, mask_paths, val_size=0.15, test_size=0.15, seed=42):
-    """Split fisso train/val/test per Rabbani (nessun gruppo/soggetto disponibile nei metadati).
+    """Fixed train/val/test split for Rabbani (no group/subject available in the metadata).
 
-    Lo stesso seed va usato in tutte le fasi del progetto, cosi' il test set di Rabbani
-    resta identico ovunque (baseline, augmentation, adaptation, joint training).
+    The same seed must be used across all phases of the project, so the Rabbani test set
+    stays identical everywhere (baseline, augmentation, adaptation, joint training).
     """
     idx = np.arange(len(image_paths))
     train_idx, temp_idx = train_test_split(idx, test_size=(val_size + test_size), random_state=seed)
@@ -202,12 +202,12 @@ def split_rabbani_data(image_paths, mask_paths, val_size=0.15, test_size=0.15, s
 
 
 def get_aggressive_transforms(img_size=(256, 256), use_blood_index=False):
-    """Augmentation 'aggressive' per la Fase 2 (Su et al., AAAI 2023 / setup chirurgico:
-    luminosita'/contrasto, hue/saturation, gamma, blur, noise, compressione).
+    """'Aggressive' augmentation for Phase 2 (Su et al., AAAI 2023 / surgical setting:
+    brightness/contrast, hue/saturation, gamma, blur, noise, compression).
 
-    Il val_transform e' identico a quello di get_transforms(), cosi' la valutazione resta
-    comparabile tra gli esperimenti 'light' (Fase 1) e 'aggressive' (Fase 2): cambia solo
-    cosa vede il modello in training, non come viene misurato.
+    val_transform is identical to the one in get_transforms(), so evaluation stays
+    comparable between the 'light' (Phase 1) and 'aggressive' (Phase 2) experiments: only
+    what the model sees during training changes, not how it is measured.
     """
     additional_targets = {"blood_index": "mask"} if use_blood_index else None
 
@@ -236,9 +236,9 @@ def get_aggressive_transforms(img_size=(256, 256), use_blood_index=False):
 
 
 def get_rabbani_train_pool(data_dir, seed=42, val_size=0.15, test_size=0.15):
-    """Solo le immagini (senza maschere) dello split di training di Rabbani: pool di
-    immagini non annotate del dominio target per la Fase 3 (mai il val/test, per non
-    contaminare la valutazione cross-dataset).
+    """Only the images (no masks) of the Rabbani training split: a pool of unlabeled
+    target-domain images for Phase 3 (never val/test, to avoid contaminating the
+    cross-dataset evaluation).
     """
     images, masks = load_rabbani_data(os.path.join(data_dir, "rabbani"))
     (train_img, _), _, _ = split_rabbani_data(images, masks, seed=seed, val_size=val_size, test_size=test_size)
@@ -246,11 +246,11 @@ def get_rabbani_train_pool(data_dir, seed=42, val_size=0.15, test_size=0.15):
 
 
 def get_hemoset_all_images(data_dir):
-    """Tutte le immagini di HemoSet (senza maschere): pool di immagini non annotate del
-    dominio target per la Fase 3 quando si allena su Rabbani. Coerente con il fatto che
-    tutto HemoSet e' gia' usato, senza etichette, come target di valutazione cross-dataset
-    per i modelli allenati su Rabbani (setting transduttivo, esplicitamente sanzionato
-    dalla tutor: 'puoi utilizzare anche immagini non annotate del dominio target').
+    """All HemoSet images (no masks): a pool of unlabeled target-domain images for
+    Phase 3 when training on Rabbani. Consistent with the fact that all of HemoSet is
+    already used, unlabeled, as the cross-dataset evaluation target for models trained
+    on Rabbani (a transductive setting, explicitly sanctioned: 'you can also use
+    unlabeled images from the target domain').
     """
     images, _, _, _ = load_hemoset_data(os.path.join(data_dir, "hemoset"))
     return images

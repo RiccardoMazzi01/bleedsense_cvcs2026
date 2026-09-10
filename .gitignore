@@ -5,20 +5,20 @@ venv/
 .venv/
 *.egg-info/
 
-# Data (mai versionare i dataset, sono troppo grandi / non nostri da ridistribuire)
+# Data (never version the datasets, they're too large / not ours to redistribute)
 data/
 datasets/
 *.zip
 *.tar
 *.tar.gz
 
-# Checkpoints e output pesanti
+# Checkpoints and heavy output
 checkpoints/
 *.pth
 *.pt
 *.ckpt
 
-# Log SLURM e training
+# SLURM and training logs
 logs/
 *.out
 *.err

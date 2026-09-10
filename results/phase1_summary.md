@@ -1,8 +1,8 @@
-# Fase 1 - Risultati baseline (in-domain vs cross-dataset)
+# Phase 1 - Baseline results (in-domain vs cross-dataset)
 
-Media +/- deviazione standard sui 5 fold per HemoSet; run singolo per Rabbani.
+Mean +/- standard deviation over the 5 HemoSet folds; single run for Rabbani.
 
-| Setting | Architettura | DICE | IOU | PRECISION | RECALL | F1 | HD95 |
+| Setting | Architecture | DICE | IOU | PRECISION | RECALL | F1 | HD95 |
 |---|---|---|---|---|---|---|---|
 | HemoSet -> HemoSet (in-domain) | unet | 0.738±0.035 | 0.607±0.038 | 0.779±0.056 | 0.726±0.037 | 0.738±0.035 | 25.852±5.863 |
 | HemoSet -> Rabbani (cross) | unet | 0.218±0.033 | 0.149±0.025 | 0.638±0.081 | 0.179±0.036 | 0.218±0.033 | 134.346±20.055 |

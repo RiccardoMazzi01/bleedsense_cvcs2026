@@ -14,13 +14,13 @@ ARCHITECTURES = {
 class MixStyle(nn.Module):
     """Domain Generalization with MixStyle (Zhou et al., ICLR 2021).
 
-    Mescola media/deviazione standard per canale delle feature map tra coppie di
-    campioni nello stesso batch: ogni campione viene normalizzato con le proprie
-    statistiche (come una instance norm) e poi ri-scalato con statistiche miste
-    (combinazione convessa con quelle di un altro campione del batch, peso ~Beta(alpha,alpha)).
-    A differenza di Reinhard/FDA (Fase 3, sempre attivi sui pixel), qui l'intervento e'
-    a livello di feature dentro l'encoder, probabilistico (attivo solo in training, con
-    probabilita' p per batch) e non richiede immagini del dominio target.
+    Mixes the per-channel mean/standard deviation of the feature maps between pairs of
+    samples in the same batch: each sample is normalized with its own statistics
+    (like an instance norm) and then re-scaled with mixed statistics (a convex
+    combination with another batch sample's, weight ~Beta(alpha,alpha)). Unlike
+    Reinhard/FDA (Phase 3, always active on pixels), the intervention here is at the
+    feature level inside the encoder, probabilistic (active only during training, with
+    probability p per batch), and requires no target-domain images.
     """
 
     def __init__(self, p=0.5, alpha=0.1, eps=1e-6):
@@ -48,16 +48,16 @@ class MixStyle(nn.Module):
 
 
 def attach_mixstyle(model, layers=("layer1", "layer2"), p=0.5, alpha=0.1):
-    """Aggancia MixStyle come forward hook sui blocchi indicati dell'encoder ResNet.
+    """Attaches MixStyle as a forward hook on the given blocks of the ResNet encoder.
 
-    Ogni MixStyle e' registrato come sottomodulo di `model` (non solo catturato in una
-    closure), cosi' model.train()/model.eval() ne propaga correttamente lo stato.
+    Each MixStyle is registered as a submodule of `model` (not just captured in a
+    closure), so model.train()/model.eval() correctly propagates its state.
     """
     for name in layers:
         block = getattr(model.encoder, name, None)
         if block is None:
-            raise ValueError(f"Layer encoder '{name}' non trovato: MixStyle richiede un encoder "
-                              f"stile ResNet (layer1..layer4)")
+            raise ValueError(f"Encoder layer '{name}' not found: MixStyle requires a "
+                              f"ResNet-style encoder (layer1..layer4)")
         mixstyle = MixStyle(p=p, alpha=alpha)
         setattr(model, f"_mixstyle_{name}", mixstyle)
         block.register_forward_hook(lambda m, inp, out, ms=mixstyle: ms(out))
@@ -67,7 +67,7 @@ def attach_mixstyle(model, layers=("layer1", "layer2"), p=0.5, alpha=0.1):
 def get_model(architecture, encoder_name="resnet34", encoder_weights="imagenet", in_channels=3, classes=1,
               mixstyle_layers=None, mixstyle_p=0.5, mixstyle_alpha=0.1):
     if architecture not in ARCHITECTURES:
-        raise ValueError(f"Architettura sconosciuta: {architecture}. Disponibili: {list(ARCHITECTURES)}")
+        raise ValueError(f"Unknown architecture: {architecture}. Available: {list(ARCHITECTURES)}")
 
     model_cls = ARCHITECTURES[architecture]
     model = model_cls(
@@ -75,7 +75,7 @@ def get_model(architecture, encoder_name="resnet34", encoder_weights="imagenet",
         encoder_weights=encoder_weights,
         in_channels=in_channels,
         classes=classes,
-        activation=None,  # restiamo in logit space, la sigmoid e' gestita da loss/metriche
+        activation=None,  # stay in logit space, sigmoid is handled by the loss/metrics
     )
 
     if mixstyle_layers:

@@ -1,11 +1,11 @@
 #!/bin/bash
-# Estensione extra (dopo il tentativo negativo col blood-index): MixStyle (Zhou et al.,
-# ICLR 2021), style mixing a livello di feature dentro l'encoder invece che sui pixel.
-# Testato su augmentation 'light' / adaptation 'none' (stessa condizione della Fase 1 e
-# della baseline 'none' in Fase 3), per isolare l'effetto del solo MixStyle e confrontarlo
-# direttamente sia con la baseline sia con Reinhard/FDA sulla stessa base.
-# 3 architetture x (5 fold HemoSet + 1 run Rabbani) = 18 job.
-# Da lanciare da /work/cvcs2026/bleedsense sul cluster.
+# Extra extension (after the negative blood-index attempt): MixStyle (Zhou et al.,
+# ICLR 2021), feature-level style mixing inside the encoder instead of on pixels.
+# Tested on 'light' augmentation / 'none' adaptation (same condition as Phase 1 and
+# the 'none' baseline in Phase 3), to isolate the effect of MixStyle alone and compare
+# it directly against both the baseline and Reinhard/FDA on the same basis.
+# 3 architectures x (5 HemoSet folds + 1 Rabbani run) = 18 jobs.
+# Launch from /work/cvcs2026/bleedsense on the cluster.
 set -e
 
 ARCHITECTURES=(unet unetplusplus deeplabv3plus)

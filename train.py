@@ -37,9 +37,9 @@ ADAPTATION_FUNCTIONS = {
     "fda": fda_transfer,
 }
 
-# Seed fisso per gli split dei dati: garantisce che ogni architettura/run veda
-# esattamente gli stessi fold HemoSet e lo stesso train/val/test di Rabbani,
-# indipendentemente dal seed usato per init pesi/augmentation (--seed).
+# Fixed seed for the data splits: guarantees that every architecture/run sees
+# exactly the same HemoSet folds and the same Rabbani train/val/test,
+# regardless of the seed used for weight init/augmentation (--seed).
 SPLIT_SEED = 42
 
 
@@ -72,7 +72,7 @@ def build_hemoset_fold(data_dir, fold, img_size, augmentation="light", adaptatio
     train_idx, val_idx = splits[fold]
 
     train_tf, _ = AUGMENTATION_TRANSFORMS[augmentation](img_size, use_blood_index=use_blood_index)
-    _, val_tf = get_transforms(img_size, use_blood_index=use_blood_index)  # valutazione sempre senza augmentation, per confrontabilita'
+    _, val_tf = get_transforms(img_size, use_blood_index=use_blood_index)  # evaluation always without augmentation, for comparability
 
     if adaptation == "none":
         train_ds = MedicalBleedingDataset(images[train_idx], masks[train_idx], transform=train_tf,
@@ -101,7 +101,7 @@ def build_rabbani_splits(data_dir, img_size, augmentation="light", adaptation="n
         images, masks, seed=SPLIT_SEED
     )
     train_tf, _ = AUGMENTATION_TRANSFORMS[augmentation](img_size, use_blood_index=use_blood_index)
-    _, val_tf = get_transforms(img_size, use_blood_index=use_blood_index)  # valutazione sempre senza augmentation, per confrontabilita'
+    _, val_tf = get_transforms(img_size, use_blood_index=use_blood_index)  # evaluation always without augmentation, for comparability
 
     if adaptation == "none":
         train_ds = MedicalBleedingDataset(train_img, train_mask, transform=train_tf,
@@ -149,36 +149,36 @@ def main():
     parser.add_argument("--architecture", choices=["unet", "unetplusplus", "deeplabv3plus"], required=True)
     parser.add_argument("--encoder", default="resnet34")
     parser.add_argument("--fold", type=int, default=0,
-                         help="Indice fold (0-4), usato con --dataset hemoset o joint")
+                         help="Fold index (0-4), used with --dataset hemoset or joint")
     parser.add_argument("--augmentation", choices=["light", "aggressive"], default="light",
-                         help="Policy di data augmentation per il training (Fase 2)")
+                         help="Data augmentation policy for training (Phase 2)")
     parser.add_argument("--adaptation", choices=["none", "reinhard", "fda"], default="none",
-                         help="Appearance/domain adaptation verso il dominio target (Fase 3)")
+                         help="Appearance/domain adaptation towards the target domain (Phase 3)")
     parser.add_argument("--joint-sampling", choices=["natural", "balanced"], default="natural",
-                         help="Solo con --dataset joint: 'balanced' pesca meta' batch da ciascun dominio "
-                              "indipendentemente dalla sua dimensione (WeightedRandomSampler)")
+                         help="Only with --dataset joint: 'balanced' draws half of each batch from "
+                              "each domain regardless of its size (WeightedRandomSampler)")
     parser.add_argument("--use-blood-index", action="store_true",
-                         help="Aggiunge un 4o canale di input R/(R+G+B), pensato per essere meno "
-                              "sensibile a differenze di camera/illuminazione tra i due dataset. "
-                              "Non ancora supportato insieme a --adaptation diversa da 'none'.")
+                         help="Adds a 4th input channel R/(R+G+B), meant to be less sensitive "
+                              "to camera/illumination differences between the two datasets. "
+                              "Not yet supported together with --adaptation other than 'none'.")
     parser.add_argument("--mixstyle", action="store_true",
-                         help="Aggancia MixStyle (Zhou et al., ICLR 2021) su layer1/layer2 "
-                              "dell'encoder: mescola le statistiche delle feature map tra campioni "
-                              "dello stesso batch per generalizzare a domini mai visti, senza bisogno "
-                              "di immagini del dominio target (a differenza di Reinhard/FDA).")
+                         help="Attaches MixStyle (Zhou et al., ICLR 2021) on layer1/layer2 "
+                              "of the encoder: mixes feature-map statistics between samples "
+                              "in the same batch to generalize to unseen domains, without needing "
+                              "target-domain images (unlike Reinhard/FDA).")
     parser.add_argument("--data-dir", default="/work/cvcs2026/bleedsense/datasets")
     parser.add_argument("--output-dir", default="/work/cvcs2026/bleedsense/results")
     parser.add_argument("--epochs", type=int, default=40)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--img-size", type=int, default=256)
-    parser.add_argument("--seed", type=int, default=42, help="Seed per init pesi/augmentation")
+    parser.add_argument("--seed", type=int, default=42, help="Seed for weight init/augmentation")
     parser.add_argument("--num-workers", type=int, default=4)
-    parser.add_argument("--patience", type=int, default=8, help="Early stopping su Dice di validazione")
+    parser.add_argument("--patience", type=int, default=8, help="Early stopping on validation Dice")
     args = parser.parse_args()
 
     if args.use_blood_index and args.adaptation != "none":
-        raise ValueError("--use-blood-index non e' ancora supportato insieme a --adaptation diversa da 'none'")
+        raise ValueError("--use-blood-index is not yet supported together with --adaptation other than 'none'")
 
     set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -197,24 +197,24 @@ def main():
     os.makedirs(ckpt_dir, exist_ok=True)
     ckpt_path = os.path.join(ckpt_dir, f"{run_name}_best.pth")
 
-    # --- Dati ---
+    # --- Data ---
     is_joint = args.dataset == "joint"
     if args.dataset == "hemoset":
         train_ds, val_ds = build_hemoset_fold(args.data_dir, args.fold, img_size, args.augmentation, args.adaptation,
                                                use_blood_index=args.use_blood_index)
-        cross_ds = build_rabbani_splits(args.data_dir, img_size, use_blood_index=args.use_blood_index)[2]  # test split di Rabbani
+        cross_ds = build_rabbani_splits(args.data_dir, img_size, use_blood_index=args.use_blood_index)[2]  # Rabbani test split
         cross_name = "rabbani_test"
-        indomain_test_ds = val_ds  # per HemoSet il val set del fold e' il proxy in-domain
+        indomain_test_ds = val_ds  # for HemoSet, the fold's val set is the in-domain proxy
     elif args.dataset == "rabbani":
         train_ds, val_ds, indomain_test_ds = build_rabbani_splits(
             args.data_dir, img_size, args.augmentation, args.adaptation, use_blood_index=args.use_blood_index
         )
-        cross_ds = build_hemoset_full(args.data_dir, img_size, use_blood_index=args.use_blood_index)  # tutto HemoSet, mai visto in training
+        cross_ds = build_hemoset_full(args.data_dir, img_size, use_blood_index=args.use_blood_index)  # all of HemoSet, never seen in training
         cross_name = "hemoset_full"
     else:
-        # Fase 4: training congiunto su HemoSet (fold) + Rabbani (train split), valutazione
-        # separata sui due test set held-out (nessun senso di "cross-dataset" qui: il modello
-        # ha visto entrambi i domini in training).
+        # Phase 4: joint training on HemoSet (fold) + Rabbani (train split), evaluated
+        # separately on the two held-out test sets (no "cross-dataset" concept here: the
+        # model has seen both domains during training).
         hemoset_train_ds, hemoset_eval_ds = build_hemoset_fold(
             args.data_dir, args.fold, img_size, args.augmentation, args.adaptation,
             use_blood_index=args.use_blood_index
@@ -223,14 +223,14 @@ def main():
             args.data_dir, img_size, args.augmentation, args.adaptation, use_blood_index=args.use_blood_index
         )
         train_ds = ConcatDataset([hemoset_train_ds, rabbani_train_ds])
-        val_ds = hemoset_eval_ds  # segnale per early stopping/scheduler durante il training
+        val_ds = hemoset_eval_ds  # signal for early stopping/scheduler during training
 
     sampler = None
     if is_joint and args.joint_sampling == "balanced":
-        # Peso per immagine inversamente proporzionale alla dimensione del proprio dominio:
-        # ogni dominio ha ~50% di probabilita' di essere pescato in ciascun batch,
-        # indipendentemente da quante immagini contribuisce (corregge lo sbilanciamento
-        # osservato in Fase 4, dove HemoSet pesava ~59% solo perche' piu' numeroso).
+        # Per-image weight inversely proportional to the size of its own domain: each
+        # domain has ~50% probability of being drawn in each batch, regardless of how
+        # many images it contributes (corrects the imbalance observed in Phase 4, where
+        # HemoSet weighed ~59% simply because it was more numerous).
         n_hemoset, n_rabbani = len(hemoset_train_ds), len(rabbani_train_ds)
         weights = [1.0 / n_hemoset] * n_hemoset + [1.0 / n_rabbani] * n_rabbani
         sampler = WeightedRandomSampler(weights, num_samples=len(train_ds), replacement=True)
@@ -249,7 +249,7 @@ def main():
                                            num_workers=args.num_workers)
         cross_loader = DataLoader(cross_ds, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
-    # --- Modello ---
+    # --- Model ---
     in_channels = 4 if args.use_blood_index else 3
     mixstyle_layers = ("layer1", "layer2") if args.mixstyle else None
     model = get_model(args.architecture, encoder_name=args.encoder, in_channels=in_channels,
@@ -286,11 +286,11 @@ def main():
         else:
             epochs_no_improve += 1
             if epochs_no_improve >= args.patience:
-                print(f"[{run_name}] early stopping all'epoca {epoch} "
-                      f"(nessun miglioramento da {args.patience} epoche)", flush=True)
+                print(f"[{run_name}] early stopping at epoch {epoch} "
+                      f"(no improvement for {args.patience} epochs)", flush=True)
                 break
 
-    # --- Valutazione finale con il best checkpoint ---
+    # --- Final evaluation with the best checkpoint ---
     model.load_state_dict(torch.load(ckpt_path, map_location=device))
 
     result = {
@@ -323,7 +323,7 @@ def main():
         result["hemoset_test"] = hemoset_metrics
         result["rabbani_test"] = rabbani_metrics
 
-        print(f"[{run_name}] FATTO. HemoSet dice={hemoset_metrics['dice']:.4f} "
+        print(f"[{run_name}] DONE. HemoSet dice={hemoset_metrics['dice']:.4f} "
               f"| Rabbani dice={rabbani_metrics['dice']:.4f}", flush=True)
     else:
         indomain_tracker = MetricTracker()
@@ -337,14 +337,14 @@ def main():
         result["indomain_test"] = indomain_metrics
         result["cross_dataset_test"] = {"target": cross_name, **cross_metrics}
 
-        print(f"[{run_name}] FATTO. In-domain dice={indomain_metrics['dice']:.4f} "
+        print(f"[{run_name}] DONE. In-domain dice={indomain_metrics['dice']:.4f} "
               f"| Cross-dataset ({cross_name}) dice={cross_metrics['dice']:.4f}", flush=True)
 
     results_path = os.path.join(args.output_dir, f"{run_name}.json")
     with open(results_path, "w") as f:
         json.dump(result, f, indent=2)
 
-    print(f"[{run_name}] Risultati salvati in {results_path}", flush=True)
+    print(f"[{run_name}] Results saved to {results_path}", flush=True)
 
 
 if __name__ == "__main__":

@@ -65,23 +65,23 @@ def main():
         h_joint_bal, r_joint_bal = joint_metrics(arch, "balanced")
 
         if h_base is not None:
-            rows.append(("HemoSet test", arch, "single-source (Fase 1)", h_base))
+            rows.append(("HemoSet test", arch, "single-source (Phase 1)", h_base))
         if h_joint is not None:
-            rows.append(("HemoSet test", arch, "joint naturale (Fase 4)", h_joint))
+            rows.append(("HemoSet test", arch, "natural joint (Phase 4)", h_joint))
         if h_joint_bal is not None:
-            rows.append(("HemoSet test", arch, "joint bilanciato (Fase 4b)", h_joint_bal))
+            rows.append(("HemoSet test", arch, "balanced joint (Phase 4b)", h_joint_bal))
         if r_base is not None:
-            rows.append(("Rabbani test", arch, "single-source (Fase 1)", r_base))
+            rows.append(("Rabbani test", arch, "single-source (Phase 1)", r_base))
         if r_joint is not None:
-            rows.append(("Rabbani test", arch, "joint naturale (Fase 4)", r_joint))
+            rows.append(("Rabbani test", arch, "natural joint (Phase 4)", r_joint))
         if r_joint_bal is not None:
-            rows.append(("Rabbani test", arch, "joint bilanciato (Fase 4b)", r_joint_bal))
+            rows.append(("Rabbani test", arch, "balanced joint (Phase 4b)", r_joint_bal))
 
     if not rows:
-        print("Nessun risultato trovato in", RESULTS_DIR)
+        print("No results found in", RESULTS_DIR)
         return
 
-    header = "| Test set | Architettura | Training | " + " | ".join(m.upper() for m in METRICS) + " |"
+    header = "| Test set | Architecture | Training | " + " | ".join(m.upper() for m in METRICS) + " |"
     sep = "|---" * (3 + len(METRICS)) + "|"
     lines = [header, sep]
     for test_set, arch, training, metrics in rows:
@@ -93,11 +93,11 @@ def main():
 
     out_path = os.path.join(RESULTS_DIR, "phase4_joint_summary.md")
     with open(out_path, "w") as f:
-        f.write("# Fase 4/4b - Joint training (naturale vs bilanciato) vs single-source\n\n")
-        f.write("Media +/- deviazione standard sui 5 fold HemoSet; Rabbani single-source e' un run singolo.\n\n")
+        f.write("# Phase 4/4b - Joint training (natural vs balanced) vs single-source\n\n")
+        f.write("Mean +/- standard deviation over the 5 HemoSet folds; Rabbani single-source is a single run.\n\n")
         f.write(table_md + "\n")
 
-    print(f"\nSalvato anche in {out_path}")
+    print(f"\nAlso saved to {out_path}")
 
 
 if __name__ == "__main__":

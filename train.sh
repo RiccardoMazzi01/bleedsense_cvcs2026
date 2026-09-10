@@ -7,19 +7,19 @@
 #SBATCH --output=/work/cvcs2026/bleedsense/logs/%x_%j.out
 #SBATCH --error=/work/cvcs2026/bleedsense/logs/%x_%j.err
 #SBATCH --account=cvcs2026
-# NB: QOS non specificata volutamente: per utenti studente viene assegnata
-# automaticamente all_qos_sprod da parte del sistema di submission.
+# NB: QOS deliberately not specified: for student users it is assigned
+# automatically as all_qos_sprod by the submission system.
 #
-# Uso: sbatch --job-name=<nome> train.sh <dataset> <architecture> <fold> <augmentation> <adaptation> <joint_sampling> <blood_index> <mixstyle>
-# Esempio: sbatch --job-name=hemoset_unet_f0 train.sh hemoset unet 0 light none
+# Usage: sbatch --job-name=<name> train.sh <dataset> <architecture> <fold> <augmentation> <adaptation> <joint_sampling> <blood_index> <mixstyle>
+# Example: sbatch --job-name=hemoset_unet_f0 train.sh hemoset unet 0 light none
 #          sbatch --job-name=hemoset_unet_f0_aug train.sh hemoset unet 0 aggressive none
 #          sbatch --job-name=hemoset_unet_f0_reinhard train.sh hemoset unet 0 light reinhard
 #          sbatch --job-name=joint_unet_f0_bal train.sh joint unet 0 light none balanced
 #          sbatch --job-name=hemoset_unet_f0_bloodidx train.sh hemoset unet 0 aggressive none natural true
 #          sbatch --job-name=hemoset_unet_f0_mixstyle train.sh hemoset unet 0 light none natural false true
 #
-# Per un test rapido (debug, priorita' alta, max 1h/1GPU) sovrascrivi
-# partition/qos/time da riga di comando, es.:
+# For a quick test (debug, high priority, max 1h/1GPU) override
+# partition/qos/time from the command line, e.g.:
 #   sbatch --qos=all_qos_dbg --time=00:10:00 --job-name=debug train.sh hemoset unet 0 light none
 
 set -e

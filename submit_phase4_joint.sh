@@ -1,10 +1,10 @@
 #!/bin/bash
-# Sottomette i run della Fase 4 (joint training): training su HemoSet+Rabbani insieme,
-# valutazione separata sui due test set held-out (mai mescolati).
-# Augmentation 'light' e adaptation 'none' per isolare l'effetto del solo joint training
-# rispetto alle baseline single-dataset della Fase 1.
-# 3 architetture x 5 fold HemoSet (accoppiate allo stesso train split di Rabbani) = 15 job.
-# Da lanciare da /work/cvcs2026/bleedsense sul cluster.
+# Submits the Phase 4 runs (joint training): training on HemoSet+Rabbani together,
+# evaluated separately on the two held-out test sets (never mixed).
+# 'light' augmentation and 'none' adaptation to isolate the effect of joint training
+# alone against the single-dataset baselines from Phase 1.
+# 3 architectures x 5 HemoSet folds (each paired with the same Rabbani train split) = 15 jobs.
+# Launch from /work/cvcs2026/bleedsense on the cluster.
 set -e
 
 ARCHITECTURES=(unet unetplusplus deeplabv3plus)

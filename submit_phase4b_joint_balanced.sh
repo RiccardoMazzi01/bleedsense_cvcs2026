@@ -1,10 +1,10 @@
 #!/bin/bash
-# Fase 4b (esperimento extra): joint training con campionamento bilanciato tra domini
-# (WeightedRandomSampler, ~50% HemoSet / ~50% Rabbani per batch indipendentemente dalla
-# dimensione dei due dataset), per correggere lo sbilanciamento osservato nella Fase 4
-# "naturale" (dove HemoSet pesava ~59% solo perche' piu' numeroso).
-# 3 architetture x 5 fold = 15 job.
-# Da lanciare da /work/cvcs2026/bleedsense sul cluster.
+# Phase 4b (extra experiment): joint training with domain-balanced sampling
+# (WeightedRandomSampler, ~50% HemoSet / ~50% Rabbani per batch regardless of the
+# two datasets' sizes), to correct the imbalance observed in the "natural" Phase 4
+# (where HemoSet weighed ~59% simply because it was more numerous).
+# 3 architectures x 5 folds = 15 jobs.
+# Launch from /work/cvcs2026/bleedsense on the cluster.
 set -e
 
 ARCHITECTURES=(unet unetplusplus deeplabv3plus)

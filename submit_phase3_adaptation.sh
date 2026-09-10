@@ -1,9 +1,9 @@
 #!/bin/bash
-# Sottomette i run della Fase 3 (appearance/domain adaptation): Reinhard color transfer
-# e Fourier Domain Adaptation (FDA), augmentation 'light' come nella Fase 1 per isolare
-# l'effetto dell'adaptation. 3 architetture x (5 fold HemoSet + 1 run Rabbani) x 2 metodi
-# = 36 job.
-# Da lanciare da /work/cvcs2026/bleedsense sul cluster.
+# Submits the Phase 3 runs (appearance/domain adaptation): Reinhard color transfer
+# and Fourier Domain Adaptation (FDA), 'light' augmentation as in Phase 1 to isolate
+# the effect of adaptation. 3 architectures x (5 HemoSet folds + 1 Rabbani run) x 2 methods
+# = 36 jobs.
+# Launch from /work/cvcs2026/bleedsense on the cluster.
 set -e
 
 ARCHITECTURES=(unet unetplusplus deeplabv3plus)

@@ -1,9 +1,9 @@
 #!/bin/bash
-# Sottomette i run della Fase 2 (augmentation 'aggressive'):
-# 3 architetture x (5 fold HemoSet + 1 run Rabbani) = 18 job.
-# La condizione 'light' e' gia' coperta dai risultati della Fase 1 (submit_phase1_baseline.sh),
-# quindi qui si lancia solo la condizione aggressive per il confronto.
-# Da lanciare da /work/cvcs2026/bleedsense sul cluster.
+# Submits the Phase 2 runs ('aggressive' augmentation):
+# 3 architectures x (5 HemoSet folds + 1 Rabbani run) = 18 jobs.
+# The 'light' condition is already covered by the Phase 1 results (submit_phase1_baseline.sh),
+# so only the aggressive condition is launched here for comparison.
+# Launch from /work/cvcs2026/bleedsense on the cluster.
 set -e
 
 ARCHITECTURES=(unet unetplusplus deeplabv3plus)
