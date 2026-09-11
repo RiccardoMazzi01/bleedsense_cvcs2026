@@ -20,8 +20,6 @@ Automating hemostasis management in robotic surgery — identifying and controll
 - **HemoSet**: induced bleeding during teleoperated robotic surgery on a porcine model, 962 image-mask pairs, 10 subjects.
 - **Rabbani et al.**: gynecological laparoscopy on human patients, 751 annotated images.
 
-Following supervisor guidance, and given the delayed availability of annotated TRAMIS data and this project being carried out individually rather than in a group, its scope was narrowed from the original project brief's dual-stage bleeding-region segmentation and source-point localization under real-time constraints, to a focused study of cross-dataset segmentation robustness — the aspect identified as most immediately useful to the broader TRAMIS effort.
-
 Previous work from the research group had observed an *asymmetric* performance drop when a model trained on one of the two datasets is evaluated on the other: HemoSet→Rabbani shows a strong general performance drop, while Rabbani→HemoSet shows a marked increase in false positives (non-hemorrhagic regions segmented as blood).
 
 **Project goal**: to quantify this asymmetry rigorously and reproducibly, and to systematically study which strategies actually increase the cross-dataset robustness of segmentation models, comparing multiple experimental conditions without the constraint of converging on a single solution.
