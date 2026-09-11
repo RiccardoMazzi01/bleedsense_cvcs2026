@@ -346,21 +346,21 @@
 
 <h2>Final Table — Comparative Summary (averaged over 3 architectures)</h2>
 <table class="final-table">
-<thead><tr><th>Strategy</th><th>Phase</th><th>HemoSet test (in-domain)</th><th>Rabbani test (in-domain)</th><th>HemoSet→Rabbani (cross)</th><th>Rabbani→HemoSet (cross)</th></tr></thead>
+<thead><tr><th>Strategy</th><th>Phase</th><th>HemoSet Dice</th><th>HemoSet HD95</th><th>Rabbani Dice</th><th>Rabbani HD95</th><th>H→R Dice</th><th>H→R HD95</th><th>R→H Dice</th><th>R→H HD95</th></tr></thead>
 <tbody>
-<tr><td>Baseline (source-only, light augmentation)</td><td>1</td><td>0.745</td><td>0.684</td><td>0.217</td><td>0.585</td></tr>
-<tr><td>Aggressive augmentation</td><td>2</td><td>0.747</td><td>0.681</td><td>0.321</td><td>0.601</td></tr>
-<tr><td>Appearance adaptation (Reinhard)</td><td>3</td><td>0.719</td><td>0.611</td><td>0.263</td><td>0.577</td></tr>
-<tr><td>Appearance adaptation (FDA)</td><td>3</td><td>0.720</td><td>0.675</td><td>0.242</td><td>0.550</td></tr>
-<tr><td>Natural joint training</td><td>4</td><td>0.742</td><td>0.636</td><td>n/a*</td><td>n/a*</td></tr>
-<tr><td>Balanced joint training</td><td>4b</td><td>0.739</td><td>0.656</td><td>n/a*</td><td>n/a*</td></tr>
-<tr><td>Blood-index channel (on aggressive)</td><td>extra</td><td>0.744</td><td>0.685</td><td>0.331</td><td>0.526</td></tr>
-<tr><td>MixStyle (on light/none)</td><td>extra</td><td>0.745</td><td>0.671</td><td>0.203</td><td>0.561</td></tr>
-<tr><td>Test-time BN recalibration (on aggressive)</td><td>extra</td><td>n/a**</td><td>n/a**</td><td>0.318</td><td>0.570</td></tr>
-<tr><td><strong>Ensemble of 3 architectures (on aggressive)</strong></td><td>extra</td><td><strong>0.770</strong></td><td><strong>0.706</strong></td><td><strong>0.343</strong></td><td><strong>0.623</strong></td></tr>
+<tr><td>Baseline (source-only, light augmentation)</td><td>1</td><td>0.745</td><td>28.9</td><td>0.684</td><td>48.0</td><td>0.217</td><td>129.9</td><td>0.585</td><td>58.7</td></tr>
+<tr><td>Aggressive augmentation</td><td>2</td><td>0.747</td><td>28.3</td><td>0.681</td><td>41.4</td><td>0.321</td><td>93.9</td><td>0.601</td><td>54.3</td></tr>
+<tr><td>Appearance adaptation (Reinhard)</td><td>3</td><td>0.719</td><td>32.2</td><td>0.611</td><td>70.2</td><td>0.263</td><td>101.0</td><td>0.577</td><td>54.9</td></tr>
+<tr><td>Appearance adaptation (FDA)</td><td>3</td><td>0.720</td><td>30.5</td><td>0.675</td><td>47.8</td><td>0.242</td><td>107.9</td><td>0.550</td><td>66.1</td></tr>
+<tr><td>Natural joint training</td><td>4</td><td>0.742</td><td>28.6</td><td>0.636</td><td>58.5</td><td>n/a*</td><td>n/a*</td><td>n/a*</td><td>n/a*</td></tr>
+<tr><td>Balanced joint training</td><td>4b</td><td>0.739</td><td>31.3</td><td>0.656</td><td>55.2</td><td>n/a*</td><td>n/a*</td><td>n/a*</td><td>n/a*</td></tr>
+<tr><td>Blood-index channel (on aggressive)</td><td>extra</td><td>0.744</td><td>&mdash;&dagger;</td><td>0.685</td><td>&mdash;&dagger;</td><td>0.331</td><td>&mdash;&dagger;</td><td>0.526</td><td>&mdash;&dagger;</td></tr>
+<tr><td>MixStyle (on light/none)</td><td>extra</td><td>0.745</td><td>&mdash;&dagger;</td><td>0.671</td><td>&mdash;&dagger;</td><td>0.203</td><td>&mdash;&dagger;</td><td>0.561</td><td>&mdash;&dagger;</td></tr>
+<tr><td>Test-time BN recalibration (on aggressive)</td><td>extra</td><td>n/a**</td><td>n/a**</td><td>n/a**</td><td>n/a**</td><td>0.318</td><td>104.3</td><td>0.570</td><td>61.9</td></tr>
+<tr><td><strong>Ensemble of 3 architectures (on aggressive)</strong></td><td>extra</td><td><strong>0.770</strong></td><td><strong>24.6</strong></td><td><strong>0.706</strong></td><td><strong>39.6</strong></td><td><strong>0.343</strong></td><td><strong>91.5</strong></td><td><strong>0.623</strong></td><td><strong>49.6</strong></td></tr>
 </tbody>
 </table>
-<p class="note">* joint training is evaluated in-domain on both test sets (having seen both domains during training), so there is no true "cross-dataset" condition to report for this row. ** test-time BN recalibration adapts the statistics towards a specific target domain, so it does not produce a single static model that is also valid in-domain: for this reason it has no comparable in-domain value.</p>
+<p class="note">* joint training is evaluated in-domain on both test sets (having seen both domains during training), so there is no true "cross-dataset" condition to report for this row. ** test-time BN recalibration adapts the statistics towards a specific target domain, so it does not produce a single static model that is also valid in-domain: for this reason it has no comparable in-domain value. &dagger; HD95 was not tabulated for this extension (see Table 6/7 above for the Dice-only comparison it was evaluated with).</p>
 
 <div class="conclusion"><strong>Recommended configuration: aggressive augmentation in training + ensemble of the 3 architectures at inference</strong> — the only combination that improves cross-dataset robustness in both directions, with no appreciable in-domain cost. The three additional extensions (blood-index, MixStyle, test-time BN) do not beat it, but their analysis is discussed in the main report (Section 5.2).</div>
 
